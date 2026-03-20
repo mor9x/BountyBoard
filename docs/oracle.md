@@ -47,7 +47,7 @@ Oracle runtime values:
 - `BOARD_ID`
 - `ORACLE_CAP_ID`
 - `ORACLE_PRIVATE_KEY`
-- `ORACLE_DB_PATH`
+- `ORACLE_DB_PATH` (`.data/oracle.db` when running from `apps/oracle`)
 - `ORACLE_POLL_INTERVAL_MS`
 
 Deployment reference values kept in `.env.local`:

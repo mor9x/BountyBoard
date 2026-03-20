@@ -44,7 +44,7 @@ export function loadOracleConfig(): OracleConfig {
     boardId: requireEnv("BOARD_ID"),
     oracleCapId: requireEnv("ORACLE_CAP_ID"),
     oraclePrivateKey: requireEnv("ORACLE_PRIVATE_KEY"),
-    dbPath: requireEnv("ORACLE_DB_PATH", "apps/oracle/.data/oracle.db"),
+    dbPath: requireEnv("ORACLE_DB_PATH", ".data/oracle.db"),
     pollIntervalMs: parsePositiveInt("ORACLE_POLL_INTERVAL_MS", 5_000),
     graphQLPageSize: parsePositiveInt("ORACLE_GRAPHQL_PAGE_SIZE", 50),
     healthPort: parsePositiveInt("ORACLE_HEALTH_PORT", 4318),
