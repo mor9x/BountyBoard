@@ -69,7 +69,7 @@ describe("matchKillmailEvent", () => {
       insurances: []
     };
 
-    const actions = matchKillmailEvent(config, snapshot, baseEvent);
+    const actions = matchKillmailEvent(config, snapshot, baseEvent, 0);
     expect(actions.map((action) => action.objectId)).toEqual(["0xsingle-any", "0xmulti-ship"]);
   });
 });

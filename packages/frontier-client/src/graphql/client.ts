@@ -27,10 +27,14 @@ function resolveProxy(endpoint: string, configuredProxy?: string) {
     return configuredProxy;
   }
 
-  const upperHttp = process.env.HTTP_PROXY;
-  const upperHttps = process.env.HTTPS_PROXY;
-  const lowerHttp = process.env.http_proxy;
-  const lowerHttps = process.env.https_proxy;
+  const runtimeEnv =
+    typeof process !== "undefined" && process.env
+      ? process.env
+      : undefined;
+  const upperHttp = runtimeEnv?.HTTP_PROXY;
+  const upperHttps = runtimeEnv?.HTTPS_PROXY;
+  const lowerHttp = runtimeEnv?.http_proxy;
+  const lowerHttps = runtimeEnv?.https_proxy;
 
   if (endpoint.startsWith("https://")) {
     return upperHttps ?? lowerHttps ?? upperHttp ?? lowerHttp ?? undefined;

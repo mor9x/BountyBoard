@@ -3,15 +3,18 @@ import { queryKillmailEvents, utopiaEnvironment } from "@bounty-board/frontier-c
 
 export function useKillmailEvents() {
   return useQuery({
-    queryKey: ["killmail-events", utopiaEnvironment.worldPackageId],
+    queryKey: ["killmail-events", utopiaEnvironment.simulationWorldPackageId],
+    refetchInterval: 5000,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
     queryFn: () =>
       queryKillmailEvents(
         { endpoint: utopiaEnvironment.graphqlUrl },
         {
-          packageId: utopiaEnvironment.worldPackageId,
+          packageId: utopiaEnvironment.simulationWorldPackageId,
           first: 10
         }
       ),
-    enabled: Boolean(utopiaEnvironment.worldPackageId)
+    enabled: Boolean(utopiaEnvironment.simulationWorldPackageId)
   });
 }

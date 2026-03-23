@@ -1,8 +1,8 @@
 {
-  "packageId": "0x779d5c3ac2f8d1612c8aed71855549db2ee1d3dca2708c6fed1082f32bf36677",
-  "boardId": "0x0d7f441482aaa71638c1e370e1aab1a0a9036c9a02c926e876ea27ff153b4bcf",
-  "oracleCapId": "0x4635c851fd53b5f7b90c89f0f1bd1f5984c73874737ae9e2520117cea8ce853c",
-  "upgradeCapId": "0x4b60e7a075f8cdabadd02946ec8f45274e3ff434c0728ca160408455327a6db7",
-  "transactionDigest": "BhYvBhfKF2PdSiN5uVoE2P2rLJVvNbHMLfwy61NYj1Gz",
-  "checkpoint": "313930103"
+  "packageId": "0xb76cfc4868d11b774136d0890837258aaf081be8cd22f3a78a55ce1da23bd12f",
+  "boardId": "0xb6254b0d49b7d835d6fec9e4244ac4e3f934b400f1ac76b76bf8428ddd193cf6",
+  "oracleCapId": "0x7c597a4a58b09ec9a486de3f2e98e8ae8d9324d765a3965c6f5f7da7f7a3b36d",
+  "upgradeCapId": "0x781b32120351889006c8e1765caaaa5949cfa49daaac3afafb41c8a83d1d60fa",
+  "transactionDigest": "87K9GcTnwcKSKH72a4w7NK6z8hGizDavLt9vyba4yRhm",
+  "checkpoint": "314094048"
 }

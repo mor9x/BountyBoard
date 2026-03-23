@@ -35,7 +35,7 @@ const MILLIS_PER_DAY: u64 = 86_400_000;
 public struct RewardToken has drop {}
 
 fun tenant(): String {
-    string::utf8(b"TEST")
+    string::utf8(b"utopia")
 }
 
 fun empty_note(): String {

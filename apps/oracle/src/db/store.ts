@@ -176,7 +176,14 @@ export class OracleStore {
 
       switch (event.kind) {
         case "SingleBountyCreatedEvent":
-          if (event.bountyId && event.targetKey?.itemId && event.targetKey.tenant && event.lossFilter !== null && event.coinType && event.expiresAtMs !== null) {
+          if (
+            event.bountyId &&
+            event.targetKey?.itemId != null &&
+            event.targetKey.tenant != null &&
+            event.lossFilter !== null &&
+            event.coinType &&
+            event.expiresAtMs !== null
+          ) {
             this.db
               .query(
                 "insert into active_single_bounties (object_id, target_item_id, target_tenant, loss_filter, coin_type, expires_at_ms, updated_at) values (?, ?, ?, ?, ?, ?, ?) on conflict(object_id) do update set target_item_id = excluded.target_item_id, target_tenant = excluded.target_tenant, loss_filter = excluded.loss_filter, coin_type = excluded.coin_type, expires_at_ms = excluded.expires_at_ms, updated_at = excluded.updated_at"
@@ -208,8 +215,8 @@ export class OracleStore {
         case "MultiBountyCreatedEvent":
           if (
             event.bountyId &&
-            event.targetKey?.itemId &&
-            event.targetKey.tenant &&
+            event.targetKey?.itemId != null &&
+            event.targetKey.tenant != null &&
             event.lossFilter !== null &&
             event.coinType &&
             event.expiresAtMs !== null &&
@@ -262,8 +269,8 @@ export class OracleStore {
         case "InsuranceCreatedEvent":
           if (
             event.orderId &&
-            event.insuredKey?.itemId &&
-            event.insuredKey.tenant &&
+            event.insuredKey?.itemId != null &&
+            event.insuredKey.tenant != null &&
             event.lossFilter !== null &&
             event.coinType &&
             event.expiresAtMs !== null &&

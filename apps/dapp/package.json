@@ -12,6 +12,7 @@
     "@bounty-board/frontier-client": "workspace:*",
     "@evefrontier/dapp-kit": "0.1.7",
     "@mysten/dapp-kit": "0.14.53",
+    "@mysten/dapp-kit-react": "^1.1.0",
     "@tanstack/react-query": "5.91.2",
     "react": "19.2.4",
     "react-dom": "19.2.4",

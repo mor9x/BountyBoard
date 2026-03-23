@@ -225,7 +225,7 @@ describe("frontier-client", () => {
               type: "0xbounty::bounty_board::SingleBountyPool<0x2::sui::SUI>",
               hasPublicTransfer: true,
               fields: {
-                target_key: { item_id: "2002", tenant: "TEST" },
+                target_key: { item_id: "2002", tenant: "utopia" },
                 loss_filter: "1",
                 expires_at_ms: "1234"
               }
@@ -242,7 +242,7 @@ describe("frontier-client", () => {
               type: "0xbounty::bounty_board::MultiBountyPool<0x2::sui::SUI>",
               hasPublicTransfer: true,
               fields: {
-                target_key: { item_id: "2002", tenant: "TEST" },
+                target_key: { item_id: "2002", tenant: "utopia" },
                 loss_filter: "0",
                 expires_at_ms: "2234",
                 target_kills: "10",
@@ -262,7 +262,7 @@ describe("frontier-client", () => {
               type: "0xbounty::bounty_board::InsuranceOrder<0x2::sui::SUI>",
               hasPublicTransfer: true,
               fields: {
-                insured_key: { item_id: "2002", tenant: "TEST" },
+                insured_key: { item_id: "2002", tenant: "utopia" },
                 loss_filter: "2",
                 expires_at_ms: "3234",
                 spawn_mode: "2",
@@ -284,30 +284,42 @@ describe("frontier-client", () => {
     expect(snapshot.singles).toEqual([
       {
         objectId: "0xsingle1",
-        target: { itemId: 2002, tenant: "TEST" },
+        target: { itemId: 2002, tenant: "utopia" },
         lossFilter: 1,
         coinType: "0x2::sui::SUI",
-        expiresAtMs: 1234
+        rewardAmount: 0,
+        note: null,
+        expiresAtMs: 1234,
+        settled: false,
+        claimableByHunter: [],
+        contributions: []
       }
     ]);
     expect(snapshot.multis).toEqual([
       {
         objectId: "0xmulti1",
-        target: { itemId: 2002, tenant: "TEST" },
+        target: { itemId: 2002, tenant: "utopia" },
         lossFilter: 0,
         coinType: "0x2::sui::SUI",
+        rewardAmount: 0,
+        note: null,
         expiresAtMs: 2234,
         targetKills: 10,
         recordedKills: 2,
-        perKillReward: 100
+        perKillReward: 100,
+        settled: false,
+        claimableByHunter: [],
+        contributions: []
       }
     ]);
     expect(snapshot.insurances).toEqual([
       {
         objectId: "0xinsurance1",
-        insured: { itemId: 2002, tenant: "TEST" },
+        insured: { itemId: 2002, tenant: "utopia" },
         lossFilter: 2,
         coinType: "0x2::sui::SUI",
+        rewardAmount: 0,
+        note: null,
         expiresAtMs: 3234,
         spawnMode: 2,
         spawnTargetKills: 5

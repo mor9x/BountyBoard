@@ -84,7 +84,7 @@ describe("OracleStore", () => {
       singles: [
         {
           objectId: "0xsingle-new",
-          target: { itemId: 2002, tenant: "TEST" },
+          target: { itemId: 2002, tenant: "utopia" },
           lossFilter: 1,
           coinType: "0x2::sui::SUI",
           expiresAtMs: 999
@@ -97,7 +97,7 @@ describe("OracleStore", () => {
     expect(store.snapshot().singles).toEqual([
       {
         objectId: "0xsingle-new",
-        target: { itemId: 2002, tenant: "TEST" },
+        target: { itemId: 2002, tenant: "utopia" },
         lossFilter: 1,
         coinType: "0x2::sui::SUI",
         expiresAtMs: 999

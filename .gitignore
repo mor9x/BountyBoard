@@ -5,7 +5,7 @@ build/
 coverage/
 .turbo/
 apps/oracle/.data/
-
+oracle.db
 .last_pub.txt
 .env
 .env.local

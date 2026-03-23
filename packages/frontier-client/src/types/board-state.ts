@@ -16,7 +16,18 @@ export type ActiveSingleBoardRecord = {
   target: TenantItemIdJson;
   lossFilter: number;
   coinType: string;
+  rewardAmount: number;
+  note: string | null;
   expiresAtMs: number;
+  settled: boolean;
+  claimableByHunter: Array<{
+    key: TenantItemIdJson;
+    amount: number;
+  }>;
+  contributions: Array<{
+    key: TenantItemIdJson;
+    amount: number;
+  }>;
 };
 
 export type ActiveMultiBoardRecord = ActiveSingleBoardRecord & {
@@ -30,6 +41,8 @@ export type ActiveInsuranceBoardRecord = {
   insured: TenantItemIdJson;
   lossFilter: number;
   coinType: string;
+  rewardAmount: number;
+  note: string | null;
   expiresAtMs: number;
   spawnMode: number;
   spawnTargetKills: number;

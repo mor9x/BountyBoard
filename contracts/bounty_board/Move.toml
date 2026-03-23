@@ -3,4 +3,4 @@ name = "bounty_board"
 edition = "2024.beta"
 
 [dependencies]
-world = { git = "https://github.com/evefrontier/world-contracts.git", subdir = "contracts/world", rev = "main" }
+world = { local = "../../../world-contracts/contracts/world" }

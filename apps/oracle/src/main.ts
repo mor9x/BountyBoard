@@ -1,23 +1,10 @@
 import { createSuiReadClient, getBoardRegistrySnapshot, type GraphQLClientConfig } from "@bounty-board/frontier-client";
-import { BOUNTY_EVENT_STREAMS, KILLMAIL_STREAM } from "./constants";
+import { BOUNTY_EVENT_STREAMS } from "./constants";
 import { loadOracleConfig } from "./config";
-import { OracleStore, buildProcessedActionKey, oracleStreamKeys } from "./db/store";
-import { fetchKillmailEdges } from "./feed/killmail";
-import { buildLifecycleStreams, fetchLifecycleEdges } from "./feed/lifecycle";
+import { OracleStore, oracleStreamKeys } from "./db/store";
 import { startHealthServer } from "./http";
-import { matchKillmailEvent } from "./matcher";
+import { syncKillmail, syncLifecycle } from "./sync";
 import { OracleWriter } from "./writer";
-
-type LifecycleSyncResult = {
-  didWork: boolean;
-  perStreamCounts: Record<string, number>;
-};
-
-type KillmailSyncResult = {
-  didWork: boolean;
-  killmailCount: number;
-  actionCount: number;
-};
 
 function logInfo(message: string, details?: Record<string, unknown>) {
   if (details) {
@@ -28,99 +15,13 @@ function logInfo(message: string, details?: Record<string, unknown>) {
   console.info(`[oracle] ${message}`);
 }
 
-function actionSummary(action: ReturnType<typeof matchKillmailEvent>[number]) {
-  if (action.kind === "settle-single") {
-    return {
-      kind: action.kind,
-      objectId: action.objectId,
-      killmailItemId: action.killmailItemId,
-      hunterCharacterObjectId: action.hunterCharacterObjectId
-    };
+function logError(message: string, details?: Record<string, unknown>) {
+  if (details) {
+    console.error(`[oracle] ${message}`, details);
+    return;
   }
 
-  if (action.kind === "record-multi-kill") {
-    return {
-      kind: action.kind,
-      objectId: action.objectId,
-      killmailItemId: action.killmailItemId,
-      hunterCharacterObjectId: action.hunterCharacterObjectId,
-      nextRecordedKills: action.nextRecordedKills,
-      targetKills: action.targetKills
-    };
-  }
-
-  return {
-    kind: action.kind,
-    objectId: action.objectId,
-    killmailItemId: action.killmailItemId,
-    killerCharacterObjectId: action.killerCharacterObjectId
-  };
-}
-
-async function syncLifecycle(
-  store: OracleStore,
-  config: ReturnType<typeof loadOracleConfig>,
-  graphQLConfig: GraphQLClientConfig
-): Promise<LifecycleSyncResult> {
-  let didWork = false;
-  const perStreamCounts: Record<string, number> = {};
-
-  for (const stream of buildLifecycleStreams(BOUNTY_EVENT_STREAMS)) {
-    const cursor = store.getCursor(stream.streamKey);
-    const edges = await fetchLifecycleEdges(config, graphQLConfig, stream, cursor);
-    perStreamCounts[stream.streamKey] = edges.length;
-
-    for (const edge of edges) {
-      store.applyLifecycleEvent(stream.streamKey, edge.cursor, edge.event);
-      didWork = true;
-    }
-  }
-
-  return { didWork, perStreamCounts };
-}
-
-async function syncKillmail(
-  store: OracleStore,
-  writer: OracleWriter,
-  config: ReturnType<typeof loadOracleConfig>,
-  graphQLConfig: GraphQLClientConfig
-): Promise<KillmailSyncResult> {
-  let didWork = false;
-  let actionCount = 0;
-  const cursor = store.getCursor(KILLMAIL_STREAM);
-  const edges = await fetchKillmailEdges(config, graphQLConfig, cursor);
-
-  for (const edge of edges) {
-    const actions = matchKillmailEvent(config, store.snapshot(), edge.event);
-
-    for (const action of actions) {
-      const actionKey = buildProcessedActionKey(action);
-      if (store.hasProcessedAction(actionKey)) {
-        continue;
-      }
-
-      logInfo("writing oracle action", actionSummary(action));
-      const digest = await writer.execute(action);
-      logInfo("oracle write succeeded", {
-        kind: action.kind,
-        objectId: action.objectId,
-        killmailItemId: action.killmailItemId,
-        digest
-      });
-      store.recordSuccessfulAction(action, digest);
-      didWork = true;
-      actionCount += 1;
-    }
-
-    store.recordKillmailProcessed(edge.cursor);
-    didWork = true;
-  }
-
-  return {
-    didWork,
-    killmailCount: edges.length,
-    actionCount
-  };
+  console.error(`[oracle] ${message}`);
 }
 
 async function main() {
@@ -187,36 +88,46 @@ async function main() {
 
   try {
     while (true) {
-      const lifecycle = await syncLifecycle(store, config, graphQLConfig);
-      const killmail = await syncKillmail(store, writer, config, graphQLConfig);
-      store.clearLastError();
-
-      const lifecycleTotal = Object.values(lifecycle.perStreamCounts).reduce((sum, count) => sum + count, 0);
-      if (lifecycleTotal > 0 || killmail.killmailCount > 0 || killmail.actionCount > 0) {
-        idleCycles = 0;
-        logInfo("sync cycle", {
-          lifecycleTotal,
-          lifecycleStreams: lifecycle.perStreamCounts,
-          killmailCount: killmail.killmailCount,
-          actionCount: killmail.actionCount
+      try {
+        const lifecycle = await syncLifecycle(store, config, graphQLConfig);
+        const killmail = await syncKillmail(store, writer, config, graphQLConfig, {
+          logInfo,
+          logError
         });
-      }
+        store.clearLastError();
 
-      if (!lifecycle.didWork && !killmail.didWork) {
-        idleCycles += 1;
-        if (idleCycles === 1 || idleCycles % 12 === 0) {
-          logInfo("idle heartbeat", {
-            pollIntervalMs: config.pollIntervalMs,
-            active: store.health(streamKeys).active
+        const lifecycleTotal = Object.values(lifecycle.perStreamCounts).reduce((sum, count) => sum + count, 0);
+        if (lifecycleTotal > 0 || killmail.killmailCount > 0 || killmail.actionCount > 0) {
+          idleCycles = 0;
+          logInfo("sync cycle", {
+            lifecycleTotal,
+            lifecycleStreams: lifecycle.perStreamCounts,
+            killmailCount: killmail.killmailCount,
+            actionCount: killmail.actionCount
           });
         }
+
+        if (!lifecycle.didWork && !killmail.didWork) {
+          idleCycles += 1;
+          if (idleCycles === 1 || idleCycles % 12 === 0) {
+            logInfo("idle heartbeat", {
+              pollIntervalMs: config.pollIntervalMs,
+              active: store.health(streamKeys).active
+            });
+          }
+          await Bun.sleep(config.pollIntervalMs);
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        store.setLastError(message);
+        logError("sync error", { message });
         await Bun.sleep(config.pollIntervalMs);
       }
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     store.setLastError(message);
-    console.error("[oracle] fatal error", { message });
+    logError("fatal error", { message });
     shutdown();
     throw error;
   }

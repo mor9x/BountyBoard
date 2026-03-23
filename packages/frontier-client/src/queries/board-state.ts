@@ -1,5 +1,4 @@
-import type { SuiMoveObject } from "@mysten/sui/client";
-import type { MoveStruct, MoveValue } from "@mysten/sui/client";
+import type { MoveStruct, MoveValue, SuiMoveObject } from "@mysten/sui/jsonRpc";
 import type { SuiReadClient } from "../rpc/client";
 import type {
   ActiveInsuranceBoardRecord,
@@ -49,6 +48,97 @@ function asNumber(value: MoveValue, fieldName: string) {
   }
 
   throw new Error(`Board field ${fieldName} is missing or not numeric`);
+}
+
+function asBoolean(value: MoveValue, fieldName: string) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  throw new Error(`Board field ${fieldName} is missing or not boolean`);
+}
+
+function asString(value: MoveValue): string | null {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const fields = asMoveStructFields(value);
+  if (!fields) {
+    return null;
+  }
+
+  if (typeof fields.bytes === "string") {
+    return fields.bytes;
+  }
+
+  return null;
+}
+
+function asBalanceValue(value: MoveValue, fieldName: string) {
+  if (typeof value === "string" || typeof value === "number") {
+    return asNumber(value, fieldName);
+  }
+
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`Board field ${fieldName} is missing or not a balance`);
+  }
+
+  const fields = asMoveStructFields(value as MoveStruct);
+  if (!fields) {
+    throw new Error(`Board field ${fieldName} is missing or not a balance`);
+  }
+
+  return asNumber(fields.value ?? null, `${fieldName}.value`);
+}
+
+function asOptionalBalanceValue(value: MoveValue, fieldName: string) {
+  if (value == null) {
+    return 0;
+  }
+
+  try {
+    return asBalanceValue(value, fieldName);
+  } catch {
+    return 0;
+  }
+}
+
+function asVecMapEntries(value: MoveValue) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return [];
+  }
+
+  const fields = asMoveStructFields(value as MoveStruct);
+  if (!fields) {
+    return [];
+  }
+
+  const contents = fields.contents;
+  if (!Array.isArray(contents)) {
+    return [];
+  }
+
+  return contents.flatMap((entry) => {
+    const entryFields = asMoveStructFields(entry as MoveStruct);
+    const key = toTenantItemId(entryFields?.key ?? null);
+    const amount = asNumber(entryFields?.value ?? null, "vec_map.value");
+
+    if (!key?.itemId || !key.tenant) {
+      return [];
+    }
+
+    return [
+      {
+        key,
+        amount
+      }
+    ];
+  });
 }
 
 function asIdArray(value: MoveValue): string[] {
@@ -127,7 +217,12 @@ function parseActiveSingleRecord(object: ReadableMoveObject): ActiveSingleBoardR
     target,
     lossFilter: asNumber(fields.loss_filter ?? null, "loss_filter"),
     coinType: parseCoinType(object.type),
-    expiresAtMs: asNumber(fields.expires_at_ms ?? null, "expires_at_ms")
+    rewardAmount: asOptionalBalanceValue(fields.reward_balance ?? null, "reward_balance"),
+    note: asString(fields.note ?? null),
+    expiresAtMs: asNumber(fields.expires_at_ms ?? null, "expires_at_ms"),
+    settled: fields.settled == null ? false : asBoolean(fields.settled ?? null, "settled"),
+    claimableByHunter: asVecMapEntries(fields.claimable_by_hunter ?? []),
+    contributions: asVecMapEntries(fields.contributions ?? [])
   };
 }
 
@@ -147,10 +242,15 @@ function parseActiveMultiRecord(object: ReadableMoveObject): ActiveMultiBoardRec
     target,
     lossFilter: asNumber(fields.loss_filter ?? null, "loss_filter"),
     coinType: parseCoinType(object.type),
+    rewardAmount: asOptionalBalanceValue(fields.reward_balance ?? null, "reward_balance"),
+    note: asString(fields.note ?? null),
     expiresAtMs: asNumber(fields.expires_at_ms ?? null, "expires_at_ms"),
     targetKills: asNumber(fields.target_kills ?? null, "target_kills"),
     recordedKills: asNumber(fields.recorded_kills ?? null, "recorded_kills"),
-    perKillReward: asNumber(fields.per_kill_reward ?? null, "per_kill_reward")
+    perKillReward: asNumber(fields.per_kill_reward ?? null, "per_kill_reward"),
+    settled: false,
+    claimableByHunter: asVecMapEntries(fields.claimable_by_hunter ?? []),
+    contributions: asVecMapEntries(fields.contributions ?? [])
   };
 }
 
@@ -170,6 +270,8 @@ function parseActiveInsuranceRecord(object: ReadableMoveObject): ActiveInsurance
     insured,
     lossFilter: asNumber(fields.loss_filter ?? null, "loss_filter"),
     coinType: parseCoinType(object.type),
+    rewardAmount: asOptionalBalanceValue(fields.reward_balance ?? null, "reward_balance"),
+    note: asString(fields.note ?? null),
     expiresAtMs: asNumber(fields.expires_at_ms ?? null, "expires_at_ms"),
     spawnMode: asNumber(fields.spawn_mode ?? null, "spawn_mode"),
     spawnTargetKills: asNumber(fields.spawn_target_kills ?? null, "spawn_target_kills")

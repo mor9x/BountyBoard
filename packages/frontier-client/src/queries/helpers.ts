@@ -52,8 +52,13 @@ export function toTenantItemId(value: unknown): TenantItemIdJson | null {
   }
 
   const record = value as Record<string, unknown>;
+  const nested =
+    "fields" in record && record.fields && typeof record.fields === "object" && !Array.isArray(record.fields)
+      ? (record.fields as Record<string, unknown>)
+      : record;
+
   return {
-    itemId: toNullableNumber(record.item_id),
-    tenant: toNullableString(record.tenant)
+    itemId: toNullableNumber(nested.item_id),
+    tenant: toNullableString(nested.tenant)
   };
 }

@@ -41,9 +41,16 @@ function deriveCharacterObjectId(config: OracleConfig, itemId: number, tenant: s
 export function matchKillmailEvent(
   config: OracleConfig,
   snapshot: ActiveIndexSnapshot,
-  event: KillmailEvent
+  event: KillmailEvent,
+  nowMs = Date.now()
 ): MatchAction[] {
-  if (!event.killmailItemId || !event.killerId?.itemId || !event.killerId.tenant || !event.victimId?.itemId || !event.victimId.tenant) {
+  if (
+    event.killmailItemId == null ||
+    event.killerId?.itemId == null ||
+    event.killerId.tenant == null ||
+    event.victimId?.itemId == null ||
+    event.victimId.tenant == null
+  ) {
     return [];
   }
 
@@ -52,6 +59,7 @@ export function matchKillmailEvent(
   const singles = snapshot.singles
     .filter(
       (record) =>
+        record.expiresAtMs > nowMs &&
         record.target.itemId === event.victimId?.itemId &&
         record.target.tenant === event.victimId?.tenant &&
         matchesLossFilter(record.lossFilter, event.lossType)
@@ -67,6 +75,7 @@ export function matchKillmailEvent(
   const multis = snapshot.multis
     .filter(
       (record) =>
+        record.expiresAtMs > nowMs &&
         record.target.itemId === event.victimId?.itemId &&
         record.target.tenant === event.victimId?.tenant &&
         matchesLossFilter(record.lossFilter, event.lossType)
@@ -84,6 +93,7 @@ export function matchKillmailEvent(
   const insurances = snapshot.insurances
     .filter(
       (record) =>
+        record.expiresAtMs > nowMs &&
         record.insured.itemId === event.victimId?.itemId &&
         record.insured.tenant === event.victimId?.tenant &&
         matchesLossFilter(record.lossFilter, event.lossType)

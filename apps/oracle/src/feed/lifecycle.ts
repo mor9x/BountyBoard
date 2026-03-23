@@ -8,12 +8,18 @@ export function buildLifecycleStreams(eventNames: readonly BountyBoardEventName[
   }));
 }
 
-export async function fetchLifecycleEdges(
+export type LifecyclePage = {
+  edges: LifecycleEdge[];
+  hasNextPage: boolean;
+  endCursor: string | null;
+};
+
+export async function fetchLifecyclePage(
   config: OracleConfig,
   clientConfig: GraphQLClientConfig,
   stream: LifecycleStream,
   cursor: string | null
-): Promise<LifecycleEdge[]> {
+): Promise<LifecyclePage> {
   const page = await queryBountyBoardEvents(clientConfig, {
     packageId: config.bountyBoardPackageId,
     eventName: stream.eventName,
@@ -21,8 +27,12 @@ export async function fetchLifecycleEdges(
     after: cursor
   });
 
-  return page.edges.map((edge) => ({
-    cursor: edge.cursor,
-    event: edge.node
-  }));
+  return {
+    edges: page.edges.map((edge) => ({
+      cursor: edge.cursor,
+      event: edge.node
+    })),
+    hasNextPage: page.pageInfo.hasNextPage,
+    endCursor: page.pageInfo.endCursor
+  };
 }

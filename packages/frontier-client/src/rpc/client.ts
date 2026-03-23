@@ -1,10 +1,11 @@
-import { SuiClient } from "@mysten/sui/client";
+import { SuiJsonRpcClient } from "@mysten/sui/jsonRpc";
 import { utopiaEnvironment } from "../constants";
 
-export type SuiReadClient = Pick<SuiClient, "getObject">;
+export type SuiReadClient = Pick<SuiJsonRpcClient, "getObject" | "getCoins">;
 
 export function createSuiReadClient(rpcUrl: string = utopiaEnvironment.suiRpcUrl): SuiReadClient {
-  return new SuiClient({
+  return new SuiJsonRpcClient({
+    network: utopiaEnvironment.network,
     url: rpcUrl
   });
 }
