@@ -15,7 +15,7 @@ describe("frontier-client", () => {
     expect(getKillmailCreatedEventType("0xpackage")).toBe("0xpackage::killmail::KillmailCreatedEvent");
   });
 
-  test("builds a bounty board event type from a package id", () => {
+  test("builds a blood contract event type from a package id", () => {
     expect(getBountyBoardEventType("0xpackage", "SingleBountyCreatedEvent")).toBe(
       "0xpackage::bounty_board::SingleBountyCreatedEvent"
     );
@@ -91,7 +91,7 @@ describe("frontier-client", () => {
     expect(data.edges[0]?.cursor).toBe("cursor-1");
   });
 
-  test("maps bounty board lifecycle event fields out of GraphQL contents json", async () => {
+  test("maps blood contract lifecycle event fields out of GraphQL contents json", async () => {
     const data = await queryBountyBoardEvents(
       {
         endpoint: "https://example.com/graphql",
