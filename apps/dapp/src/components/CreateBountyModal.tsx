@@ -298,6 +298,27 @@ export function CreateBountyModal({
                   value={formData.targetUID}
                 />
               )}
+              {!formData.isFutureKiller ? (
+                <p className="mt-2 font-mono text-[11px] leading-relaxed text-white/40">
+                  {currentLang === "en" ? "You can find all player character details " : "你可以在这里找到所有玩家角色的信息："}
+                  <a
+                    className="font-semibold transition-colors hover:text-[#ff6a6a]"
+                    href="https://eve-eyes.d0v.xyz/indexer/character-creations"
+                    rel="noreferrer"
+                    style={{
+                      color: "#FF0000",
+                      textDecoration: "underline",
+                      textDecorationColor: "#FF0000",
+                      textDecorationThickness: "2px",
+                      textUnderlineOffset: "2px"
+                    }}
+                    target="_blank"
+                  >
+                    {currentLang === "en" ? "here" : "点击查看"}
+                  </a>
+                  {currentLang === "en" ? "." : ""}
+                </p>
+              ) : null}
               {!formData.isFutureKiller && formData.targetUID.trim() ? (
                 <div className="mt-2">
                   {isTargetLookupStale || targetLookupQuery.isLoading || targetLookupQuery.isFetching ? (
