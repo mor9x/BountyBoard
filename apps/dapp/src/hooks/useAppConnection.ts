@@ -45,7 +45,7 @@ export function useAppConnection() {
           ? `EVE Vault rejected this site origin (${window.location.origin}). Open the dapp from http://localhost:5173 and retry.`
           : message
       );
-      console.error("[BountyBoard] Failed to connect wallet:", error);
+      console.error("[BloodContract] Failed to connect wallet:", error);
       return false;
     }
   }

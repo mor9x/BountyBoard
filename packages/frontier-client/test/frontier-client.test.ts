@@ -154,6 +154,32 @@ describe("frontier-client", () => {
     expect(data.edges[0]?.cursor).toBe("cursor-created");
   });
 
+  test("retries transient HTTP gateway failures from GraphQL", async () => {
+    let calls = 0;
+
+    const payload = await requestGraphQL<{ ping: string }>(
+      {
+        endpoint: "https://example.com/graphql",
+        retryDelayMs: 1,
+        fetch: async () => {
+          calls += 1;
+          if (calls < 3) {
+            return new Response("temporary failure", { status: 503 });
+          }
+
+          return new Response(JSON.stringify({ data: { ping: "ok" } }));
+        }
+      },
+      {
+        query: "query Ping { ping }",
+        variables: {}
+      }
+    );
+
+    expect(calls).toBe(3);
+    expect(payload).toEqual({ ping: "ok" });
+  });
+
   test("reads the current board registry state from object content", async () => {
     const data = await getBoardState(
       {

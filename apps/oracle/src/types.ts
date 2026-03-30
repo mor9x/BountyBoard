@@ -79,6 +79,7 @@ export type MatchAction =
 
 export type ServiceHealth = {
   alive: true;
+  ready: boolean;
   cursors: Record<string, string | null>;
   active: {
     singles: number;

@@ -27,6 +27,7 @@ describe("OracleStore", () => {
     expect(store.snapshot().singles[0]?.objectId).toBe("0xpool");
     expect(store.health(["bounty_board.SingleBountyCreatedEvent"]).totals.lifecycleEventsProcessed).toBe(1);
     expect(store.health(["bounty_board.SingleBountyCreatedEvent"]).lastLifecycleSyncAt).not.toBeNull();
+    expect(store.health(["bounty_board.SingleBountyCreatedEvent"]).ready).toBe(false);
 
     store.close();
   });
@@ -104,6 +105,10 @@ describe("OracleStore", () => {
       }
     ]);
     expect(store.health([]).lastBoardCalibrationAt).not.toBeNull();
+    expect(store.health([]).ready).toBe(true);
+
+    store.setLastError("boom");
+    expect(store.health([]).ready).toBe(false);
 
     store.close();
   });

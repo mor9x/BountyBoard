@@ -6,6 +6,7 @@ import {
   buildCreateSingleBountyTx,
   buildEmitKillmailTx,
   parseDisplayAmountToAtomicUnits,
+  buildRefundInsuranceTx,
   buildRefundMultiBountyTx,
   buildRefundSingleBountyTx,
   getCharacterByItemId,
@@ -194,10 +195,10 @@ export function HomePage() {
       return immediateDigest;
     }
 
-    for (let attempt = 0; attempt < 5; attempt += 1) {
+    for (let attempt = 0; attempt < 8; attempt += 1) {
       const page = await frontierClient.queryKillmailEvents({
         packageId: environment.simulationWorldPackageId,
-        first: 20
+        first: 50
       });
       const matchedEvent = page.nodes.find((event: { killmailItemId: number | null; digest: string | null }) =>
         event.killmailItemId === killmailItemId && Boolean(event.digest)
@@ -206,7 +207,7 @@ export function HomePage() {
         return matchedEvent.digest;
       }
 
-      await new Promise((resolve) => window.setTimeout(resolve, 800));
+      await new Promise((resolve) => window.setTimeout(resolve, 1000));
     }
 
     return null;
@@ -331,6 +332,17 @@ export function HomePage() {
     if (!selectedMirrorCharacter) throw new Error("Simulation mirror character is required");
 
     await executeTransaction(bounty.id, async () => {
+      if (bounty.kind === "insurance") {
+        return buildRefundInsuranceTx({
+          packageId: environment.bountyBoardPackageId,
+          boardId: environment.boardId,
+          clockObjectId: environment.clockObjectId,
+          coinType: bounty.coinType,
+          orderObjectId: bounty.id,
+          insuredCharacterObjectId: selectedMirrorCharacter.objectId
+        });
+      }
+
       if (bounty.kind === "multi") {
         return buildRefundMultiBountyTx({
           packageId: environment.bountyBoardPackageId,

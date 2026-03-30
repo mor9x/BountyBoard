@@ -8,6 +8,11 @@ type KillmailFeedProps = {
 export function KillmailFeed({ currentLang }: KillmailFeedProps) {
   const { data, error, isLoading } = useKillmailEvents();
   const t = (key: string) => getTranslation(currentLang, key);
+  const events = [...(data?.nodes ?? [])].sort((left, right) => {
+    const leftTime = left.timestamp ? Date.parse(left.timestamp) : 0;
+    const rightTime = right.timestamp ? Date.parse(right.timestamp) : 0;
+    return rightTime - leftTime;
+  });
 
   return (
     <section className="app-panel app-stack-md">
@@ -19,7 +24,7 @@ export function KillmailFeed({ currentLang }: KillmailFeedProps) {
       </div>
 
       <div className="app-grid-feed">
-        {data?.nodes.map((event) => (
+        {events.map((event) => (
           <article className="app-panel-inset app-stack-sm" key={event.digest ?? event.timestamp}>
             <div className="flex flex-wrap items-center justify-between gap-3 text-xs uppercase tracking-[0.2em] text-white/40">
               <span>{event.lossType ?? event.eventType}</span>

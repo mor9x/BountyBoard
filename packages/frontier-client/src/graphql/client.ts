@@ -15,7 +15,19 @@ function isRetryableGraphQLError(error: unknown) {
   }
 
   const code = "code" in error ? String(error.code) : "";
-  return code === "ECONNRESET" || code === "ETIMEDOUT" || code === "UND_ERR_CONNECT_TIMEOUT";
+  const status = "status" in error ? Number(error.status) : NaN;
+  return (
+    code === "ECONNRESET" ||
+    code === "ETIMEDOUT" ||
+    code === "UND_ERR_CONNECT_TIMEOUT" ||
+    status === 408 ||
+    status === 425 ||
+    status === 429 ||
+    status === 500 ||
+    status === 502 ||
+    status === 503 ||
+    status === 504
+  );
 }
 
 async function sleep(ms: number) {
@@ -70,7 +82,9 @@ export async function requestGraphQL<TData, TVariables extends Record<string, un
       } as RequestInit);
 
       if (!response.ok) {
-        throw new Error(`GraphQL request failed with status ${response.status}`);
+        const error = new Error(`GraphQL request failed with status ${response.status}`) as Error & { status?: number };
+        error.status = response.status;
+        throw error;
       }
 
       const payload = (await response.json()) as GraphQLResponse<TData>;

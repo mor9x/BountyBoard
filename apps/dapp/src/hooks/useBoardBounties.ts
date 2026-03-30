@@ -7,11 +7,11 @@ async function getFutureKillerBountyIds(packageId: string) {
   const futureKillerBountyIds = new Set<string>();
   let after: string | null = null;
 
-  for (let index = 0; index < 4; index += 1) {
+  while (true) {
     const page = await frontierClient.queryBountyBoardEvents({
       packageId,
       eventName: "InsuranceTriggeredEvent",
-      first: 50,
+      first: 100,
       after
     });
 
@@ -22,6 +22,10 @@ async function getFutureKillerBountyIds(packageId: string) {
     }
 
     if (!page.pageInfo.hasNextPage || !page.pageInfo.endCursor) {
+      break;
+    }
+
+    if (page.pageInfo.endCursor === after) {
       break;
     }
 
@@ -41,12 +45,10 @@ export function useBoardBounties(selectedCharacter: MirrorCharacterLookup | null
     refetchIntervalInBackground: true,
     refetchOnWindowFocus: true,
     queryFn: async () => {
-      const [snapshot, futureKillerBountyIds] = await Promise.all([
-        frontierClient.getBoardRegistrySnapshot({
-          boardId: environment.boardId
-        }),
-        getFutureKillerBountyIds(environment.bountyBoardPackageId)
-      ]);
+      const snapshot = await frontierClient.getBoardRegistrySnapshot({
+        boardId: environment.boardId
+      });
+      const futureKillerBountyIds = await getFutureKillerBountyIds(environment.bountyBoardPackageId).catch(() => new Set<string>());
 
       return {
         snapshot,

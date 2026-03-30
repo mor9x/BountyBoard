@@ -1,10 +1,10 @@
-# BountyBoard
+# BloodContract
 
-BountyBoard is an EVE Frontier hackathon project for Utopia. The repo now contains a real `bounty_board` Move package with oracle-driven settlement flows, plus a GraphQL client focused on world killmail events as the external trigger feed.
+BloodContract is an EVE Frontier hackathon project for Utopia. The repo now contains a real `bounty_board` Move package with oracle-driven settlement flows, plus a GraphQL client focused on world killmail events as the external trigger feed.
 
 ## Introduction
 
-Star Hunter Bounty Board is a player-driven bounty system for EVE Frontier.
+Star Hunter BloodContract is a player-driven bounty system for EVE Frontier.
 
 The core loop is simple:
 

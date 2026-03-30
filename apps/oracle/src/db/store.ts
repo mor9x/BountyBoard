@@ -486,9 +486,14 @@ export class OracleStore {
     const singleCount = this.db.query<CountRow, []>("select count(*) as count from active_single_bounties").get()?.count ?? 0;
     const multiCount = this.db.query<CountRow, []>("select count(*) as count from active_multi_bounties").get()?.count ?? 0;
     const insuranceCount = this.db.query<CountRow, []>("select count(*) as count from active_insurance_orders").get()?.count ?? 0;
+    const lastBoardCalibrationAt =
+      this.db.query<ValueRow, []>("select value from service_state where key = 'last_board_calibration_at'").get()?.value ?? null;
+    const lastError =
+      this.db.query<ValueRow, []>("select value from service_state where key = 'last_error'").get()?.value ?? null;
 
     return {
       alive: true,
+      ready: lastBoardCalibrationAt !== null && lastError === null,
       cursors,
       active: {
         singles: singleCount,
@@ -514,10 +519,8 @@ export class OracleStore {
         this.db.query<ValueRow, []>("select value from service_state where key = 'last_lifecycle_sync_at'").get()?.value ?? null,
       lastKillmailSyncAt:
         this.db.query<ValueRow, []>("select value from service_state where key = 'last_killmail_sync_at'").get()?.value ?? null,
-      lastBoardCalibrationAt:
-        this.db.query<ValueRow, []>("select value from service_state where key = 'last_board_calibration_at'").get()?.value ?? null,
-      lastError:
-        this.db.query<ValueRow, []>("select value from service_state where key = 'last_error'").get()?.value ?? null
+      lastBoardCalibrationAt,
+      lastError
     };
   }
 

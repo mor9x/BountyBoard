@@ -1,5 +1,6 @@
 import {
   getSupportedTokenByCoinType,
+  type ActiveInsuranceBoardRecord,
   type ActiveMultiBoardRecord,
   type ActiveSingleBoardRecord,
   type BoardRegistrySnapshot,
@@ -8,7 +9,7 @@ import {
 
 export type BountyCardModel = {
   id: string;
-  kind: "single" | "multi";
+  kind: "single" | "multi" | "insurance";
   targetLabel: string;
   targetItemId: number | null;
   targetTenant: string | null;
@@ -43,6 +44,13 @@ function amountForKey(
 
 function tokenSymbolForCoinType(coinType: string) {
   return getSupportedTokenByCoinType(coinType)?.symbol ?? coinType;
+}
+
+function matchesSelectedCharacter(
+  key: { itemId: number | null; tenant: string | null },
+  selectedCharacter: MirrorCharacterLookup | null
+) {
+  return Boolean(selectedCharacter && key.itemId === selectedCharacter.itemId && key.tenant === selectedCharacter.tenant);
 }
 
 function resolveStatus(deadline: number, claimableAmount: number, refundableAmount: number) {
@@ -107,6 +115,37 @@ function multiToCard(
   };
 }
 
+function insuranceToCard(
+  record: ActiveInsuranceBoardRecord,
+  selectedCharacter: MirrorCharacterLookup | null
+): BountyCardModel | null {
+  if (!matchesSelectedCharacter(record.insured, selectedCharacter)) {
+    return null;
+  }
+
+  const refundableAmount = record.expiresAtMs <= Date.now() ? record.rewardAmount : 0;
+
+  return {
+    id: record.objectId,
+    kind: "insurance",
+    targetLabel: String(record.insured.itemId ?? "UNKNOWN"),
+    targetItemId: record.insured.itemId,
+    targetTenant: record.insured.tenant,
+    rewardAmount: record.rewardAmount,
+    tokenSymbol: tokenSymbolForCoinType(record.coinType),
+    perKillReward: record.spawnTargetKills > 0 ? Math.floor(record.rewardAmount / record.spawnTargetKills) : record.rewardAmount,
+    killCount: record.spawnTargetKills > 0 ? record.spawnTargetKills : 1,
+    completedKills: 0,
+    deadline: record.expiresAtMs,
+    status: resolveStatus(record.expiresAtMs, 0, refundableAmount),
+    note: record.note,
+    claimableAmount: 0,
+    refundableAmount,
+    coinType: record.coinType,
+    isFutureKiller: true
+  };
+}
+
 export function snapshotToCards(
   snapshot: BoardRegistrySnapshot,
   selectedCharacter: MirrorCharacterLookup | null,
@@ -114,6 +153,10 @@ export function snapshotToCards(
 ) {
   return [
     ...snapshot.singles.map((record) => singleToCard(record, selectedCharacter, futureKillerBountyIds)),
-    ...snapshot.multis.map((record) => multiToCard(record, selectedCharacter, futureKillerBountyIds))
+    ...snapshot.multis.map((record) => multiToCard(record, selectedCharacter, futureKillerBountyIds)),
+    ...snapshot.insurances.flatMap((record) => {
+      const card = insuranceToCard(record, selectedCharacter);
+      return card ? [card] : [];
+    })
   ];
 }
