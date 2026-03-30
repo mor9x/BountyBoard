@@ -236,7 +236,12 @@ export function HomePage() {
           }
         : supportedTokens.find((entry) => entry.symbol === form.token);
     if (!token) throw new Error(`Unsupported token ${form.token}`);
-    const selectedLossFilter = form.lossType === "building" ? LOSS_FILTER.structure : LOSS_FILTER.ship;
+    const selectedLossFilter =
+      form.lossType === "building"
+        ? LOSS_FILTER.structure
+        : form.lossType === "ship"
+          ? LOSS_FILTER.ship
+          : LOSS_FILTER.any;
 
     const rewardAmount = parseDisplayAmountToAtomicUnits(form.rewardAmount, token);
 

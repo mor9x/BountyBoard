@@ -10,7 +10,7 @@ export type CreateBountyFormValue = {
   token: string;
   customCoinType: string;
   customTokenDecimals: number | null;
-  lossType: "ship" | "building";
+  lossType: "any" | "ship" | "building";
   killCount: number;
   timeframeDays: number;
   isFutureKiller: boolean;
@@ -37,7 +37,7 @@ function createInitialForm(defaultTokenSymbol: string): CreateBountyFormValue {
     token: defaultTokenSymbol,
     customCoinType: "",
     customTokenDecimals: null,
-    lossType: "ship",
+    lossType: "any",
     killCount: 1,
     timeframeDays: 7,
     isFutureKiller: false,
@@ -364,7 +364,7 @@ export function CreateBountyModal({
               <div>
                 <label className="mb-2.5 block text-sm font-light tracking-wide text-white/70">{t("createBounty.lossType")}</label>
                 <div className="flex gap-2">
-                  {(["ship", "building"] as const).map((lossType) => (
+                  {(["any", "ship", "building"] as const).map((lossType) => (
                     <button
                       key={lossType}
                       onClick={() => updateField("lossType", lossType)}
@@ -375,7 +375,11 @@ export function CreateBountyModal({
                           : "border-white/10 bg-white/5 text-white/50 hover:border-white/20"
                       }`}
                     >
-                      {t(`createBounty.lossType${lossType === "ship" ? "Ship" : "Building"}`)}
+                      {t(
+                        `createBounty.lossType${
+                          lossType === "any" ? "Any" : lossType === "ship" ? "Ship" : "Building"
+                        }`
+                      )}
                     </button>
                   ))}
                 </div>
