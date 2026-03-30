@@ -1,4 +1,4 @@
-import { utopiaEnvironment } from "@bounty-board/frontier-client";
+import { generatedDeployment, utopiaEnvironment } from "@bounty-board/frontier-client";
 import { CLOCK_OBJECT_ID } from "./constants";
 import type { OracleConfig } from "./types";
 
@@ -29,26 +29,21 @@ function parsePositiveInt(name: string, fallback: number) {
   return parsed;
 }
 
-function resolveBountyBoardPackageId() {
-  const fallback = utopiaEnvironment.bountyBoardPackageId;
-  return requireEnv("BOUNTY_BOARD_PACKAGE_ID", envValue("VITE_BOUNTY_BOARD_PACKAGE", fallback) ?? undefined);
-}
-
 export function loadOracleConfig(): OracleConfig {
   return {
-    graphQLEndpoint: requireEnv("UTOPIA_GRAPHQL_URL", envValue("VITE_SUI_GRAPHQL_URL", utopiaEnvironment.graphqlUrl) ?? undefined),
+    graphQLEndpoint: requireEnv("UTOPIA_GRAPHQL_URL", utopiaEnvironment.graphqlUrl),
     grpcUrl: requireEnv("SUI_GRPC_URL", "https://fullnode.testnet.sui.io:443"),
-    worldPackageId: requireEnv("WORLD_PACKAGE_ID", envValue("VITE_WORLD_PACKAGE", utopiaEnvironment.worldPackageId) ?? undefined),
-    worldObjectRegistryId: requireEnv("WORLD_OBJECT_REGISTRY_ID"),
-    bountyBoardPackageId: resolveBountyBoardPackageId(),
-    boardId: requireEnv("BOARD_ID"),
-    oracleCapId: requireEnv("ORACLE_CAP_ID"),
+    worldPackageId: requireEnv("WORLD_PACKAGE_ID", utopiaEnvironment.worldPackageId || undefined),
+    worldObjectRegistryId: requireEnv("WORLD_OBJECT_REGISTRY_ID", utopiaEnvironment.worldObjectRegistryId || undefined),
+    bountyBoardPackageId: requireEnv("BOUNTY_BOARD_PACKAGE_ID", generatedDeployment.packageId),
+    boardId: requireEnv("BOARD_ID", generatedDeployment.boardId),
+    oracleCapId: requireEnv("ORACLE_CAP_ID", generatedDeployment.oracleCapId),
     oraclePrivateKey: requireEnv("ORACLE_PRIVATE_KEY"),
     dbPath: requireEnv("ORACLE_DB_PATH", ".data/oracle.db"),
     pollIntervalMs: parsePositiveInt("ORACLE_POLL_INTERVAL_MS", 5_000),
     graphQLPageSize: parsePositiveInt("ORACLE_GRAPHQL_PAGE_SIZE", 50),
     healthPort: parsePositiveInt("ORACLE_HEALTH_PORT", 4318),
-    clockObjectId: requireEnv("CLOCK_OBJECT_ID", CLOCK_OBJECT_ID),
+    clockObjectId: requireEnv("CLOCK_OBJECT_ID", utopiaEnvironment.clockObjectId || CLOCK_OBJECT_ID),
     network: "testnet"
   };
 }

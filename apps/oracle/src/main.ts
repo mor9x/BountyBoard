@@ -91,6 +91,7 @@ async function main() {
       try {
         const lifecycle = await syncLifecycle(store, config, graphQLConfig);
         const killmail = await syncKillmail(store, writer, config, graphQLConfig, {
+          suiReadClient,
           logInfo,
           logError
         });

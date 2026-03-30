@@ -44,7 +44,7 @@ function amountForKey(
 }
 
 function tokenSymbolForCoinType(coinType: string) {
-  return getSupportedTokenByCoinType(coinType)?.symbol ?? coinType;
+  return getSupportedTokenByCoinType(coinType)?.symbol ?? coinType.split("::").at(-1) ?? coinType;
 }
 
 function lossTypeForFilter(lossFilter: number) {

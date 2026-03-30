@@ -9,6 +9,23 @@ type OracleWriteErrorOptions = {
   cause?: unknown;
 };
 
+const SAFE_SKIP_WRITE_ERROR_PATTERNS = [
+  "single bounty is already settled",
+  "killmail item id was already used for this bounty",
+  "multi bounty target kills already reached",
+  "insurance order has expired",
+  "bounty has expired",
+  "requested consensus object has been deleted",
+  "object has been deleted",
+  "has been deleted",
+  "could not find the referenced object",
+  "object not found",
+  "version mismatch",
+  "object version unavailable",
+  "current version",
+  "not-consensus-managed before the transaction executed"
+] as const;
+
 export class OracleWriteError extends Error {
   readonly retryable: boolean;
 
@@ -17,6 +34,11 @@ export class OracleWriteError extends Error {
     this.name = "OracleWriteError";
     this.retryable = options.retryable;
   }
+}
+
+export function isSafeToSkipOracleWriteFailure(message: string) {
+  const normalized = message.trim().toLowerCase();
+  return SAFE_SKIP_WRITE_ERROR_PATTERNS.some((pattern) => normalized.includes(pattern));
 }
 
 function keypairFromPrivateKey(privateKey: string) {
@@ -103,7 +125,7 @@ export class OracleWriter {
 
       if (result.$kind !== "Transaction") {
         const message = result.FailedTransaction.status.error?.message ?? "Oracle transaction did not execute successfully";
-        throw new OracleWriteError(message, { retryable: false });
+        throw new OracleWriteError(message, { retryable: !isSafeToSkipOracleWriteFailure(message) });
       }
 
       return result.Transaction.digest;
@@ -113,7 +135,10 @@ export class OracleWriter {
       }
 
       const message = error instanceof Error ? error.message : String(error);
-      throw new OracleWriteError(message, { retryable: true, cause: error });
+      throw new OracleWriteError(message, {
+        retryable: !isSafeToSkipOracleWriteFailure(message),
+        cause: error
+      });
     }
   }
 }

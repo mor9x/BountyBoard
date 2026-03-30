@@ -1,9 +1,9 @@
-import { formatAtomicAmount, getSupportedTokenBySymbol } from "@bounty-board/frontier-client";
+import { formatAtomicAmount, getSupportedTokenByCoinType } from "@bounty-board/frontier-client";
 import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import type { BountyCardModel } from "../lib/bounty-view";
 import { formatDate, formatRemainingTime } from "../lib/date-utils";
-import { frontierClient } from "../lib/frontier";
+import { frontierClient, readClient } from "../lib/frontier";
 import { formatMessage, getTranslation } from "../lib/language";
 import { DetailField } from "./DetailField";
 import { StatTile } from "./StatTile";
@@ -26,8 +26,13 @@ export type StatTileProps = {
   label: string;
   value: ReactNode;
   footer?: string;
+  footerTitle?: string;
   valueClassName?: string;
 };
+
+function formatTokenAmount(amount: number, token: { symbol: string; coinType: string; decimals: number } | null) {
+  return token ? formatAtomicAmount(amount, token) : amount.toLocaleString();
+}
 
 export function TaskCard({ bounty, currentLang, onClaim, onRefund: _onRefund, isPending }: TaskCardProps) {
   const t = (key: string) => getTranslation(currentLang, key);
@@ -38,20 +43,33 @@ export function TaskCard({ bounty, currentLang, onClaim, onRefund: _onRefund, is
   const isRefundable = bounty.status === "refundable" && bounty.refundableAmount > 0;
   const isInsurance = bounty.kind === "insurance";
   const environment = frontierClient.environment;
-  
-  const token = getSupportedTokenBySymbol(bounty.tokenSymbol as any);
-  const rewardLabel = token ? formatAtomicAmount(bounty.rewardAmount, token) : bounty.rewardAmount.toLocaleString();
-  const perKillLabel = token ? formatAtomicAmount(bounty.perKillReward, token) : bounty.perKillReward.toLocaleString();
-  const claimableLabel = token ? formatAtomicAmount(bounty.claimableAmount, token) : bounty.claimableAmount.toLocaleString();
-  const refundableLabel = token ? formatAtomicAmount(bounty.refundableAmount, token) : bounty.refundableAmount.toLocaleString();
+  const supportedToken = getSupportedTokenByCoinType(bounty.coinType);
+  const coinMetadataQuery = useQuery({
+    queryKey: ["task-card-coin-metadata", bounty.coinType],
+    enabled: !supportedToken,
+    queryFn: async () => readClient.getCoinMetadata({ coinType: bounty.coinType })
+  });
+  const token =
+    supportedToken ??
+    (coinMetadataQuery.data
+      ? {
+          symbol: bounty.tokenSymbol,
+          coinType: bounty.coinType,
+          decimals: coinMetadataQuery.data.decimals
+        }
+      : null);
+  const rewardLabel = formatTokenAmount(bounty.rewardAmount, token);
+  const perKillLabel = formatTokenAmount(bounty.perKillReward, token);
+  const claimableLabel = formatTokenAmount(bounty.claimableAmount, token);
+  const refundableLabel = formatTokenAmount(bounty.refundableAmount, token);
 
   const targetCharacterQuery = useQuery({
-    queryKey: ["bounty-card-target", environment.simulationWorldPackageId, bounty.targetItemId],
+    queryKey: ["bounty-card-target", environment.worldPackageId, bounty.targetItemId],
     enabled: Boolean(!isInsurance && bounty.targetItemId && bounty.targetTenant),
     queryFn: async () =>
       frontierClient.getCharacterByItemId({
-        worldPackageId: environment.simulationWorldPackageId,
-        worldObjectRegistryId: environment.simulationWorldObjectRegistryId,
+        worldPackageId: environment.worldPackageId,
+        worldObjectRegistryId: environment.worldObjectRegistryId,
         itemId: bounty.targetItemId!,
         tenant: bounty.targetTenant!
       })
@@ -119,8 +137,8 @@ export function TaskCard({ bounty, currentLang, onClaim, onRefund: _onRefund, is
             {/* Right Section: Stats & Notes */}
             <aside>
               <div className="grid auto-rows-fr gap-6 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-                <StatTile label={t("taskCard.totalReward")} value={rewardLabel} footer={bounty.tokenSymbol} valueClassName="text-3xl font-black text-[#ff5a1f]" />
-                <StatTile label={t("taskCard.perKillReward")} value={perKillLabel} footer={bounty.tokenSymbol} valueClassName="text-3xl font-black text-white" />
+                <StatTile label={t("taskCard.totalReward")} value={rewardLabel} footer={bounty.tokenSymbol} footerTitle={bounty.coinType} valueClassName="text-3xl font-black text-[#ff5a1f]" />
+                <StatTile label={t("taskCard.perKillReward")} value={perKillLabel} footer={bounty.tokenSymbol} footerTitle={bounty.coinType} valueClassName="text-3xl font-black text-white" />
                 <StatTile label={t("taskCard.deadline")} value={formatDate(bounty.deadline)} valueClassName="text-base font-bold text-white/70" />
                 <StatTile label={t("taskCard.timeRemaining")} value={formatRemainingTime(bounty.deadline, currentLang)} valueClassName={bounty.status === "expired" ? "text-2xl font-black text-white/10" : "text-2xl font-black text-[#9CFF57] shadow-sm"} />
               </div>
@@ -168,7 +186,7 @@ export function TaskCard({ bounty, currentLang, onClaim, onRefund: _onRefund, is
             >
               <span className="text-[12px] font-black uppercase tracking-[0.3em] text-[#65ffbc]">{t("taskCard.claimable")}</span>
               <span className="font-mono text-4xl font-black text-white">{claimableLabel}</span>
-              <span className="text-xs uppercase tracking-[0.4em] text-white/40">{bounty.tokenSymbol}</span>
+              <span className="text-xs uppercase tracking-[0.4em] text-white/40" title={bounty.coinType}>{bounty.tokenSymbol}</span>
             </button>
           </div>
         )}
@@ -184,7 +202,7 @@ export function TaskCard({ bounty, currentLang, onClaim, onRefund: _onRefund, is
             >
               <span className="text-[12px] font-black uppercase tracking-[0.3em] text-[#ffb066]">{t("taskCard.refundReward")}</span>
               <span className="font-mono text-4xl font-black text-white">{refundableLabel}</span>
-              <span className="text-xs uppercase tracking-[0.4em] text-white/40">{bounty.tokenSymbol}</span>
+              <span className="text-xs uppercase tracking-[0.4em] text-white/40" title={bounty.coinType}>{bounty.tokenSymbol}</span>
             </button>
           </div>
         )}

@@ -4,7 +4,6 @@ import {
   buildCreateInsuranceOrderTx,
   buildCreateMultiBountyTx,
   buildCreateSingleBountyTx,
-  buildEmitKillmailTx,
   parseDisplayAmountToAtomicUnits,
   buildRefundInsuranceTx,
   buildRefundMultiBountyTx,
@@ -20,17 +19,15 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useDAppKit } from "@mysten/dapp-kit-react";
 import { useEffect, useMemo, useState } from "react";
 import { CreateBountyModal, type CreateBountyFormValue } from "../components/CreateBountyModal";
-import { KillmailControlPanel, type KillmailFormValue } from "../components/KillmailControlPanel";
 import { Navbar } from "../components/Navbar";
 import { TaskList } from "../components/TaskList";
 import { KillmailFeed } from "../features/killmail/KillmailFeed";
 import { useBoardBounties } from "../hooks/useBoardBounties";
 import { useEnvironment } from "../hooks/useEnvironment";
 import { useAppConnection } from "../hooks/useAppConnection";
-import { useMirrorCharacter } from "../hooks/useMirrorCharacter";
 import { useWalletCharacters } from "../hooks/useWalletCharacters";
 import type { BountyCardModel } from "../lib/bounty-view";
-import { frontierClient, readClient } from "../lib/frontier";
+import { readClient } from "../lib/frontier";
 import { getTranslation, loadLanguagePreference, saveLanguagePreference, toggleLanguage } from "../lib/language";
 
 const emptyCharacters: WalletCharacter[] = [];
@@ -50,7 +47,6 @@ export function HomePage() {
   const [currentLang, setCurrentLang] = useState<"en" | "zh">("en");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isOperatorPanelOpen, setIsOperatorPanelOpen] = useState(false);
-  const [isKillmailPanelOpen, setIsKillmailPanelOpen] = useState(false);
   const [sortType, setSortType] = useState<"totalReward" | "perKillReward" | "timeRemaining">("totalReward");
   const [pendingActionId, setPendingActionId] = useState<string | null>(null);
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
@@ -82,9 +78,11 @@ export function HomePage() {
     () => walletCharacters.find((character) => character.objectId === selectedCharacterId) ?? null,
     [selectedCharacterId, walletCharacters]
   );
-  const mirrorCharacterQuery = useMirrorCharacter(selectedIdentityCharacter);
-  const selectedMirrorCharacter = (mirrorCharacterQuery.data ?? null) as MirrorCharacterLookup | null;
-  const boardBountiesQuery = useBoardBounties(selectedMirrorCharacter);
+  const selectedWorldCharacter = useMemo<MirrorCharacterLookup | null>(
+    () => (selectedIdentityCharacter ? { ...selectedIdentityCharacter, exists: true } : null),
+    [selectedIdentityCharacter]
+  );
+  const boardBountiesQuery = useBoardBounties(selectedWorldCharacter);
   const sortedCards = useMemo(
     () => sortCards(boardBountiesQuery.data?.cards ?? [], sortType),
     [boardBountiesQuery.data?.cards, sortType]
@@ -136,81 +134,9 @@ export function HomePage() {
   function invalidateAll() {
     return Promise.all([
       queryClient.invalidateQueries({ queryKey: ["wallet-characters"] }),
-      queryClient.invalidateQueries({ queryKey: ["mirror-character"] }),
       queryClient.invalidateQueries({ queryKey: ["board-snapshot"] }),
       queryClient.invalidateQueries({ queryKey: ["killmail-events"] })
     ]);
-  }
-
-  function extractTransactionDigest(result: unknown): string | null {
-    if (!result || typeof result !== "object") {
-      return null;
-    }
-
-    const record = result as {
-      digest?: unknown;
-      transactionDigest?: unknown;
-      data?: unknown;
-      result?: unknown;
-      transaction?: { digest?: unknown } | null;
-      effects?: { transactionDigest?: unknown } | null;
-    };
-
-    if (typeof record.digest === "string" && record.digest.length > 0) {
-      return record.digest;
-    }
-
-    if (typeof record.transactionDigest === "string" && record.transactionDigest.length > 0) {
-      return record.transactionDigest;
-    }
-
-    if (typeof record.transaction?.digest === "string" && record.transaction.digest.length > 0) {
-      return record.transaction.digest;
-    }
-
-    if (typeof record.effects?.transactionDigest === "string" && record.effects.transactionDigest.length > 0) {
-      return record.effects.transactionDigest;
-    }
-
-    if (record.data) {
-      const nestedDataDigest = extractTransactionDigest(record.data);
-      if (nestedDataDigest) {
-        return nestedDataDigest;
-      }
-    }
-
-    if (record.result) {
-      const nestedResultDigest = extractTransactionDigest(record.result);
-      if (nestedResultDigest) {
-        return nestedResultDigest;
-      }
-    }
-
-    return null;
-  }
-
-  async function resolveKillmailTransactionDigest(result: unknown, killmailItemId: number): Promise<string | null> {
-    const immediateDigest = extractTransactionDigest(result);
-    if (immediateDigest) {
-      return immediateDigest;
-    }
-
-    for (let attempt = 0; attempt < 8; attempt += 1) {
-      const page = await frontierClient.queryKillmailEvents({
-        packageId: environment.simulationWorldPackageId,
-        first: 50
-      });
-      const matchedEvent = page.nodes.find((event: { killmailItemId: number | null; digest: string | null }) =>
-        event.killmailItemId === killmailItemId && Boolean(event.digest)
-      );
-      if (matchedEvent?.digest) {
-        return matchedEvent.digest;
-      }
-
-      await new Promise((resolve) => window.setTimeout(resolve, 1000));
-    }
-
-    return null;
   }
 
   async function executeTransaction(
@@ -230,9 +156,16 @@ export function HomePage() {
 
   async function handleCreateBounty(form: CreateBountyFormValue) {
     if (!walletAddress) throw new Error("Connect EVE Vault first");
-    if (!selectedMirrorCharacter) throw new Error("Simulation mirror character is required");
+    if (!selectedWorldCharacter) throw new Error("Connected world character is required");
 
-    const token = supportedTokens.find((entry) => entry.symbol === form.token);
+    const token =
+      form.token === "CUSTOM"
+        ? {
+            symbol: "CUSTOM",
+            coinType: form.customCoinType.trim(),
+            decimals: form.customTokenDecimals ?? 0
+          }
+        : supportedTokens.find((entry) => entry.symbol === form.token);
     if (!token) throw new Error(`Unsupported token ${form.token}`);
     const selectedLossFilter = form.lossType === "building" ? LOSS_FILTER.structure : LOSS_FILTER.ship;
 
@@ -247,7 +180,7 @@ export function HomePage() {
           clockObjectId: environment.clockObjectId,
           coinType: token.coinType,
           amount: rewardAmount,
-          posterCharacterObjectId: selectedMirrorCharacter.objectId,
+          posterCharacterObjectId: selectedWorldCharacter.objectId,
           durationDays: form.timeframeDays,
           lossFilter: selectedLossFilter,
           note: form.remarks,
@@ -262,13 +195,13 @@ export function HomePage() {
     if (!Number.isFinite(targetItemId) || targetItemId <= 0) throw new Error("Target character UID is invalid");
 
     const resolvedTarget = await getCharacterByItemId(readClient, {
-      worldPackageId: environment.simulationWorldPackageId,
-      worldObjectRegistryId: environment.simulationWorldObjectRegistryId,
+      worldPackageId: environment.worldPackageId,
+      worldObjectRegistryId: environment.worldObjectRegistryId,
       itemId: targetItemId,
       tenant: "utopia"
     });
 
-    if (!resolvedTarget) throw new Error("Target simulation-world character was not found for this UID");
+    if (!resolvedTarget) throw new Error("Target world character was not found for this UID");
 
     if (form.killCount > 1) {
       await executeTransaction("create-multi", async () =>
@@ -279,7 +212,7 @@ export function HomePage() {
           clockObjectId: environment.clockObjectId,
           coinType: token.coinType,
           amount: rewardAmount,
-          posterCharacterObjectId: selectedMirrorCharacter.objectId,
+          posterCharacterObjectId: selectedWorldCharacter.objectId,
           targetCharacterObjectId: resolvedTarget.objectId,
           durationDays: form.timeframeDays,
           lossFilter: selectedLossFilter,
@@ -298,7 +231,7 @@ export function HomePage() {
         clockObjectId: environment.clockObjectId,
         coinType: token.coinType,
         amount: rewardAmount,
-        posterCharacterObjectId: selectedMirrorCharacter.objectId,
+        posterCharacterObjectId: selectedWorldCharacter.objectId,
         targetCharacterObjectId: resolvedTarget.objectId,
         durationDays: form.timeframeDays,
         lossFilter: selectedLossFilter,
@@ -308,7 +241,7 @@ export function HomePage() {
   }
 
   async function handleClaim(bounty: BountyCardModel) {
-    if (!selectedMirrorCharacter) throw new Error("Simulation mirror character is required");
+    if (!selectedWorldCharacter) throw new Error("Connected world character is required");
 
     await executeTransaction(bounty.id, async () =>
       bounty.kind === "multi"
@@ -317,20 +250,20 @@ export function HomePage() {
             boardId: environment.boardId,
             coinType: bounty.coinType,
             poolObjectId: bounty.id,
-            hunterCharacterObjectId: selectedMirrorCharacter.objectId
+            hunterCharacterObjectId: selectedWorldCharacter.objectId
           })
         : buildClaimSingleBountyTx({
             packageId: environment.bountyBoardPackageId,
             boardId: environment.boardId,
             coinType: bounty.coinType,
             poolObjectId: bounty.id,
-            hunterCharacterObjectId: selectedMirrorCharacter.objectId
+            hunterCharacterObjectId: selectedWorldCharacter.objectId
           })
     );
   }
 
   async function handleRefund(bounty: BountyCardModel) {
-    if (!selectedMirrorCharacter) throw new Error("Simulation mirror character is required");
+    if (!selectedWorldCharacter) throw new Error("Connected world character is required");
 
     await executeTransaction(bounty.id, async () => {
       if (bounty.kind === "insurance") {
@@ -340,7 +273,7 @@ export function HomePage() {
           clockObjectId: environment.clockObjectId,
           coinType: bounty.coinType,
           orderObjectId: bounty.id,
-          insuredCharacterObjectId: selectedMirrorCharacter.objectId
+          insuredCharacterObjectId: selectedWorldCharacter.objectId
         });
       }
 
@@ -351,7 +284,7 @@ export function HomePage() {
           clockObjectId: environment.clockObjectId,
           coinType: bounty.coinType,
           poolObjectId: bounty.id,
-          posterCharacterObjectId: selectedMirrorCharacter.objectId
+          posterCharacterObjectId: selectedWorldCharacter.objectId
         });
       }
 
@@ -361,33 +294,9 @@ export function HomePage() {
         clockObjectId: environment.clockObjectId,
         coinType: bounty.coinType,
         poolObjectId: bounty.id,
-        posterCharacterObjectId: selectedMirrorCharacter.objectId
+        posterCharacterObjectId: selectedWorldCharacter.objectId
       });
     });
-  }
-
-  async function handleEmitKillmail(form: KillmailFormValue) {
-    if (!selectedMirrorCharacter) throw new Error("Simulation mirror character is required");
-    const killmailItemId = Number(form.killmailItemId);
-
-    const result = await executeTransaction("emit-killmail", async () =>
-      Promise.resolve(
-        buildEmitKillmailTx({
-          simulationWorldPackageId: environment.simulationWorldPackageId,
-          killmailRegistryId: environment.simulationWorldKillmailRegistryId,
-          adminAclId: environment.simulationWorldAdminAclId,
-          reportedByCharacterObjectId: selectedMirrorCharacter.objectId,
-          itemId: killmailItemId,
-          killerId: Number(form.killerId),
-          victimId: Number(form.victimId),
-          killTimestamp: Number(form.killTimestamp),
-          lossType: form.lossType,
-          solarSystemId: Number(form.solarSystemId)
-        })
-      )
-    );
-
-    return resolveKillmailTransactionDigest(result, killmailItemId);
   }
 
   return (
@@ -431,7 +340,7 @@ export function HomePage() {
           <TaskList
             bounties={sortedCards}
             currentLang={currentLang}
-            isLoading={walletCharactersQuery.isLoading || mirrorCharacterQuery.isLoading || boardBountiesQuery.isLoading}
+            isLoading={walletCharactersQuery.isLoading || boardBountiesQuery.isLoading}
             onClaim={handleClaim}
             onRefund={handleRefund}
             onSortChange={setSortType}
@@ -463,27 +372,6 @@ export function HomePage() {
                     />
                   </svg>
                 </button>
-                <button
-                  aria-expanded={isKillmailPanelOpen}
-                  aria-label="Toggle Killmail Panel"
-                  className={`flex h-12 w-12 items-center justify-center border text-white transition-all duration-300 md:h-[52px] md:w-[52px] ${
-                    isKillmailPanelOpen
-                      ? "border-[#FF0000] bg-[#FF0000]/15 shadow-[0_0_12px_rgba(255,0,0,0.28)]"
-                      : "border-white/20 bg-[#2A2A2A] hover:border-[#FF0000]/60"
-                  }`}
-                  onClick={() => setIsKillmailPanelOpen((current) => !current)}
-                  title="Send Killmail"
-                  type="button"
-                >
-                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      d="M12 3v18m9-9H3m15.364-6.364L5.636 18.364"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                    />
-                  </svg>
-                </button>
               </div>
             </div>
 
@@ -503,25 +391,12 @@ export function HomePage() {
                           {t("wallet.connectViaPublish")}
                         </span>
                       )}
-                      <span
-                        className={`border px-3 py-2 text-xs ${
-                          selectedMirrorCharacter
-                            ? "border-[#00AA44]/50 bg-[#00AA44]/10 text-[#8dffc0]"
-                            : "border-[#FF0000]/50 bg-[#FF0000]/10 text-[#ff9797]"
-                        }`}
-                      >
-                        {selectedMirrorCharacter ? "Simulation Mirror Ready" : "Simulation Mirror Missing"}
-                      </span>
                     </div>
 
                     <div className="app-grid-metrics">
                       <section className="app-panel-inset app-stack-xs">
                         <div className="text-[10px] uppercase tracking-widest text-white/40">Identity World</div>
                         <div className="break-all font-mono text-xs text-white">{environment.identityWorldPackageId}</div>
-                      </section>
-                      <section className="app-panel-inset app-stack-xs">
-                        <div className="text-[10px] uppercase tracking-widest text-white/40">Simulation World</div>
-                        <div className="break-all font-mono text-xs text-white">{environment.simulationWorldPackageId}</div>
                       </section>
                       <section className="app-panel-inset app-stack-xs">
                         <div className="text-[10px] uppercase tracking-widest text-white/40">Blood Contract</div>
@@ -564,11 +439,6 @@ export function HomePage() {
                     walletCharacters.length === 0 ? (
                       <p className="font-mono text-xs text-[#FF0000]">No identity-world character found for this wallet.</p>
                     ) : null}
-                    {selectedIdentityCharacter && !selectedMirrorCharacter && !mirrorCharacterQuery.isLoading ? (
-                      <p className="font-mono text-xs text-[#FF0000]">
-                        No simulation-world mirror character found for item_id {selectedIdentityCharacter.itemId}.
-                      </p>
-                    ) : null}
                   </section>
                 ) : null}
 
@@ -580,15 +450,6 @@ export function HomePage() {
             ) : null}
           </section>
         </main>
-
-        <KillmailControlPanel
-          currentLang={currentLang}
-          isOpen={isKillmailPanelOpen}
-          isSubmitting={pendingActionId === "emit-killmail"}
-          onClose={() => setIsKillmailPanelOpen(false)}
-          onSubmit={handleEmitKillmail}
-          reportedByCharacter={selectedMirrorCharacter}
-        />
 
         <button
           aria-label={currentLang === "en" ? "Publish Bounty" : "发布悬赏"}
@@ -610,6 +471,7 @@ export function HomePage() {
           onClose={() => setIsModalOpen(false)}
           onSubmit={handleCreateBounty}
           selectedCharacter={selectedIdentityCharacter}
+          walletAddress={walletAddress ?? null}
         />
       </div>
 

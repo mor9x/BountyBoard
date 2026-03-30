@@ -5,8 +5,10 @@ import { buildProcessedActionKey, type OracleStore } from "./db/store";
 import { fetchKillmailPage, type KillmailPage } from "./feed/killmail";
 import { buildLifecycleStreams, fetchLifecyclePage, type LifecyclePage } from "./feed/lifecycle";
 import { matchKillmailEvent } from "./matcher";
+import { isLikelyOracleActionConflict, isOracleActionResolvedOnChain } from "./reconciliation";
 import type { LifecycleStream } from "./types";
 import { OracleWriteError, type OracleWriter } from "./writer";
+import type { SuiReadClient } from "@bounty-board/frontier-client";
 
 export type LifecycleSyncResult = {
   didWork: boolean;
@@ -37,6 +39,7 @@ type SyncKillmailOptions = {
     graphQLConfig: GraphQLClientConfig,
     cursor: string | null
   ) => Promise<KillmailPage>;
+  suiReadClient?: SuiReadClient;
   nowMs?: number;
   logInfo?: SyncLogger;
   logError?: SyncLogger;
@@ -127,6 +130,7 @@ export async function syncKillmail(
   options: SyncKillmailOptions = {}
 ): Promise<KillmailSyncResult> {
   const fetchPage = options.fetchPage ?? fetchKillmailPage;
+  const suiReadClient = options.suiReadClient;
   const nowMs = options.nowMs ?? Date.now();
   let didWork = false;
   let actionCount = 0;
@@ -159,6 +163,25 @@ export async function syncKillmail(
           actionCount += 1;
           didWork = true;
         } catch (error) {
+          if (error instanceof OracleWriteError && suiReadClient) {
+            const shouldConfirmOnChain = !error.retryable || isLikelyOracleActionConflict(error.message);
+
+            if (shouldConfirmOnChain) {
+              try {
+                const resolved = await isOracleActionResolvedOnChain(suiReadClient, action, nowMs);
+                if (resolved) {
+                  options.logInfo?.("oracle action resolved by current on-chain state", actionSummary(action));
+                  continue;
+                }
+              } catch (confirmationError) {
+                options.logError?.("oracle action reconciliation failed", {
+                  ...actionSummary(action),
+                  message: confirmationError instanceof Error ? confirmationError.message : String(confirmationError)
+                });
+              }
+            }
+          }
+
           if (error instanceof OracleWriteError && !error.retryable) {
             options.logError?.("oracle action skipped after terminal failure", {
               ...actionSummary(action),

@@ -11,7 +11,7 @@ export function useMirrorCharacter(character: WalletCharacter | null) {
     queryFn: async () =>
       frontierClient.getCharacterByItemId({
         worldPackageId: environment.simulationWorldPackageId,
-        worldObjectRegistryId: environment.simulationWorldObjectRegistryId,
+        worldObjectRegistryId: environment.worldObjectRegistryId,
         itemId: character!.itemId,
         tenant: character!.tenant
       })

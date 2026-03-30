@@ -22,7 +22,7 @@ function eventOccurredAtMs(event: { killTimestamp: number | null; timestamp: str
 
 export function useKillmailEvents() {
   return useQuery({
-    queryKey: ["killmail-events", utopiaEnvironment.simulationWorldPackageId],
+    queryKey: ["killmail-events", utopiaEnvironment.worldPackageId],
     refetchInterval: 5000,
     refetchIntervalInBackground: true,
     refetchOnWindowFocus: true,
@@ -34,7 +34,7 @@ export function useKillmailEvents() {
         const page = await queryKillmailEvents(
           { endpoint: utopiaEnvironment.graphqlUrl },
           {
-            packageId: utopiaEnvironment.simulationWorldPackageId,
+            packageId: utopiaEnvironment.worldPackageId,
             first: FEED_PAGE_SIZE,
             after
           }
@@ -62,6 +62,6 @@ export function useKillmailEvents() {
         }
       };
     },
-    enabled: Boolean(utopiaEnvironment.simulationWorldPackageId)
+    enabled: Boolean(utopiaEnvironment.worldPackageId)
   });
 }

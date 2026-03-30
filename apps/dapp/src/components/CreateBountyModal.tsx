@@ -1,13 +1,15 @@
-import type { MirrorCharacterLookup, SupportedToken, WalletCharacter } from "@bounty-board/frontier-client";
+import { formatAtomicAmount, type MirrorCharacterLookup, type SupportedToken, type WalletCharacter } from "@bounty-board/frontier-client";
 import { useQuery } from "@tanstack/react-query";
-import { useDeferredValue, useState } from "react";
-import { frontierClient } from "../lib/frontier";
+import { useDeferredValue, useEffect, useState } from "react";
+import { frontierClient, readClient } from "../lib/frontier";
 import { formatMessage, getTranslation } from "../lib/language";
 
 export type CreateBountyFormValue = {
   targetUID: string;
   rewardAmount: string;
-  token: SupportedToken["symbol"];
+  token: string;
+  customCoinType: string;
+  customTokenDecimals: number | null;
   lossType: "ship" | "building";
   killCount: number;
   timeframeDays: number;
@@ -19,22 +21,29 @@ type CreateBountyModalProps = {
   isOpen: boolean;
   currentLang: "en" | "zh";
   availableTokens: SupportedToken[];
+  walletAddress: string | null;
   selectedCharacter: WalletCharacter | null;
   isSubmitting: boolean;
   onClose: () => void;
   onSubmit: (value: CreateBountyFormValue) => Promise<void>;
 };
 
-const initialForm: CreateBountyFormValue = {
-  targetUID: "",
-  rewardAmount: "",
-  token: "SUI",
-  lossType: "ship",
-  killCount: 1,
-  timeframeDays: 7,
-  isFutureKiller: false,
-  remarks: ""
-};
+const CUSTOM_TOKEN_SYMBOL = "CUSTOM";
+
+function createInitialForm(defaultTokenSymbol: string): CreateBountyFormValue {
+  return {
+    targetUID: "",
+    rewardAmount: "",
+    token: defaultTokenSymbol,
+    customCoinType: "",
+    customTokenDecimals: null,
+    lossType: "ship",
+    killCount: 1,
+    timeframeDays: 7,
+    isFutureKiller: false,
+    remarks: ""
+  };
+}
 
 function utf8ByteLength(value: string) {
   return new TextEncoder().encode(value).length;
@@ -76,10 +85,15 @@ function sanitizeDecimalInput(value: string) {
   return `${integerPart}.${decimalParts.join("")}`;
 }
 
+function isValidCoinType(value: string) {
+  return /^0x[a-fA-F0-9]+::[A-Za-z_][A-Za-z0-9_]*::[A-Za-z_][A-Za-z0-9_]*$/.test(value.trim());
+}
+
 export function CreateBountyModal({
   isOpen,
   currentLang,
   availableTokens,
+  walletAddress,
   selectedCharacter,
   isSubmitting,
   onClose,
@@ -87,31 +101,87 @@ export function CreateBountyModal({
 }: CreateBountyModalProps) {
   const t = (key: string) => getTranslation(currentLang, key);
   const fm = (key: string, params: Record<string, string | number>) => formatMessage(currentLang, key, params);
-  const [formData, setFormData] = useState<CreateBountyFormValue>(initialForm);
+  const defaultTokenSymbol = availableTokens[0]?.symbol ?? CUSTOM_TOKEN_SYMBOL;
+  const [formData, setFormData] = useState<CreateBountyFormValue>(() => createInitialForm(defaultTokenSymbol));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const environment = frontierClient.environment;
   const deferredTargetUID = useDeferredValue(formData.targetUID.trim());
+  const deferredCustomCoinType = useDeferredValue(formData.customCoinType.trim());
   const shouldLookupTarget = !formData.isFutureKiller && deferredTargetUID.length > 0;
+  const shouldLookupCustomCoin = formData.token === CUSTOM_TOKEN_SYMBOL && isValidCoinType(deferredCustomCoinType);
   const targetItemId = isPositiveIntegerString(deferredTargetUID) ? Number(deferredTargetUID) : null;
   const isTargetLookupStale = !formData.isFutureKiller && formData.targetUID.trim() !== deferredTargetUID;
+  const isCustomCoinLookupStale = formData.token === CUSTOM_TOKEN_SYMBOL && formData.customCoinType.trim() !== deferredCustomCoinType;
   const targetLookupQuery = useQuery({
     queryKey: [
       "target-character-lookup",
-      environment.simulationWorldPackageId,
-      environment.simulationWorldObjectRegistryId,
+      environment.worldPackageId,
+      environment.worldObjectRegistryId,
       targetItemId
     ],
     enabled: Boolean(shouldLookupTarget && targetItemId),
     queryFn: async () =>
       frontierClient.getCharacterByItemId({
-        worldPackageId: environment.simulationWorldPackageId,
-        worldObjectRegistryId: environment.simulationWorldObjectRegistryId,
+        worldPackageId: environment.worldPackageId,
+        worldObjectRegistryId: environment.worldObjectRegistryId,
         itemId: targetItemId!,
         tenant: "utopia"
       })
   });
   const targetLookup = (targetLookupQuery.data ?? null) as MirrorCharacterLookup | null;
   const targetLookupError = targetLookupQuery.error instanceof Error ? targetLookupQuery.error.message : null;
+  const selectedPresetToken = availableTokens.find((token) => token.symbol === formData.token) ?? null;
+  const isCustomToken = formData.token === CUSTOM_TOKEN_SYMBOL;
+  const tokenDisplay = isCustomToken ? CUSTOM_TOKEN_SYMBOL : formData.token;
+  const selectedTokenCoinType = isCustomToken ? formData.customCoinType.trim() : (selectedPresetToken?.coinType ?? "");
+  const customCoinMetadataQuery = useQuery({
+    queryKey: ["custom-coin-metadata", deferredCustomCoinType],
+    enabled: shouldLookupCustomCoin,
+    queryFn: async () => readClient.getCoinMetadata({ coinType: deferredCustomCoinType })
+  });
+  const customCoinMetadata = customCoinMetadataQuery.data ?? null;
+  const customCoinDecimals = customCoinMetadata?.decimals ?? null;
+  const customCoinLookupError = customCoinMetadataQuery.error instanceof Error ? customCoinMetadataQuery.error.message : null;
+  const selectedTokenDecimals = isCustomToken ? customCoinDecimals : (selectedPresetToken?.decimals ?? null);
+  const balanceQuery = useQuery({
+    queryKey: ["wallet-token-balance", walletAddress, selectedTokenCoinType],
+    enabled: Boolean(walletAddress && selectedTokenCoinType && selectedTokenDecimals !== null),
+    queryFn: async () =>
+      readClient.getBalance({
+        owner: walletAddress!,
+        coinType: selectedTokenCoinType
+      })
+  });
+  const balanceError = balanceQuery.error instanceof Error ? balanceQuery.error.message : null;
+  const selectedTokenInfo =
+    selectedTokenCoinType && selectedTokenDecimals !== null
+      ? {
+          symbol: tokenDisplay,
+          coinType: selectedTokenCoinType,
+          decimals: selectedTokenDecimals
+        }
+      : null;
+  const formattedBalance =
+    selectedTokenInfo && balanceQuery.data
+      ? formatAtomicAmount(Number(balanceQuery.data.totalBalance), selectedTokenInfo)
+      : null;
+
+  useEffect(() => {
+    if (availableTokens.length === 0) {
+      return;
+    }
+
+    setFormData((previous) => {
+      if (previous.token === CUSTOM_TOKEN_SYMBOL || availableTokens.some((token) => token.symbol === previous.token)) {
+        return previous;
+      }
+
+      return {
+        ...previous,
+        token: defaultTokenSymbol
+      };
+    });
+  }, [availableTokens, defaultTokenSymbol]);
 
   if (!isOpen) {
     return null;
@@ -135,6 +205,13 @@ export function CreateBountyModal({
     if (!formData.rewardAmount || Number(formData.rewardAmount) <= 0) {
       nextErrors.rewardAmount = t("validation.rewardAmountPositive");
     }
+    if (formData.token === CUSTOM_TOKEN_SYMBOL && !formData.customCoinType.trim()) {
+      nextErrors.customCoinType = t("validation.customCoinTypeRequired");
+    } else if (formData.token === CUSTOM_TOKEN_SYMBOL && !isValidCoinType(formData.customCoinType)) {
+      nextErrors.customCoinType = t("validation.customCoinTypeInvalid");
+    } else if (formData.token === CUSTOM_TOKEN_SYMBOL && customCoinDecimals === null) {
+      nextErrors.customCoinType = t("validation.customCoinTypeMetadataMissing");
+    }
     if (formData.killCount < 1 || formData.killCount > 1000) {
       nextErrors.killCount = t("validation.killCountRange");
     }
@@ -153,8 +230,8 @@ export function CreateBountyModal({
     if (!validate()) return;
 
     try {
-      await onSubmit(formData);
-      setFormData(initialForm);
+      await onSubmit({ ...formData, customTokenDecimals: customCoinDecimals });
+      setFormData(createInitialForm(defaultTokenSymbol));
       setErrors({});
       onClose();
     } catch (error) {
@@ -307,10 +384,10 @@ export function CreateBountyModal({
               <div>
                 <label className="mb-2.5 block text-sm font-light tracking-wide text-white/70">{t("createBounty.tokenType")}</label>
                 <div className="flex gap-2">
-                  {availableTokens.map((token) => (
+                  {[...availableTokens, { symbol: CUSTOM_TOKEN_SYMBOL, coinType: "", decimals: 9 }].map((token) => (
                     <button
                       key={token.symbol}
-                      onClick={() => updateField("token", token.symbol as any)}
+                      onClick={() => updateField("token", token.symbol)}
                       type="button"
                       className={`flex-1 border px-3 py-3.5 font-mono text-sm transition-all duration-300 ${
                         formData.token === token.symbol
@@ -318,9 +395,70 @@ export function CreateBountyModal({
                           : "border-white/10 bg-white/5 text-white/50 hover:border-white/20"
                       }`}
                     >
-                      {token.symbol}
+                      {token.symbol === CUSTOM_TOKEN_SYMBOL ? t("createBounty.tokenTypeCustom") : token.symbol}
                     </button>
                   ))}
+                </div>
+                {isCustomToken ? (
+                  <div className="mt-3">
+                    <input
+                      className="w-full px-4 py-3.5 font-mono text-sm font-light tracking-wide"
+                      onChange={(event) => updateField("customCoinType", event.target.value)}
+                      placeholder={t("createBounty.customCoinTypePlaceholder")}
+                      type="text"
+                      value={formData.customCoinType}
+                    />
+                    <div className="mt-2 font-mono text-[10px] leading-relaxed tracking-wide text-white/35">
+                      {fm("createBounty.customCoinTypeHint", { coinType: environment.customCoinTypeHint || "--" })}
+                    </div>
+                    {errors.customCoinType ? (
+                      <p className="mt-1.5 font-mono text-xs text-[#FF0000]">{errors.customCoinType}</p>
+                    ) : null}
+                  </div>
+                ) : null}
+                <div className="mt-3 app-panel-inset app-stack-xs">
+                  <div className="text-[10px] uppercase tracking-widest text-white/40">Selected Token</div>
+                  <div className="font-mono text-sm text-white">{tokenDisplay}</div>
+                  <div className="app-stack-xs">
+                    <div className="text-[10px] uppercase tracking-widest text-white/40">Coin Type</div>
+                    <div className="break-all font-mono text-xs text-white/75">{selectedTokenCoinType || "--"}</div>
+                  </div>
+                  <div className="app-stack-xs">
+                    <div className="text-[10px] uppercase tracking-widest text-white/40">Decimals</div>
+                    <div className="font-mono text-xs text-white/75">
+                      {selectedTokenDecimals !== null ? selectedTokenDecimals : "--"}
+                    </div>
+                  </div>
+                  {isCustomToken ? (
+                    <div className="app-stack-xs">
+                      <div className="text-[10px] uppercase tracking-widest text-white/40">Metadata</div>
+                      <div className="font-mono text-xs text-white/75">
+                        {isCustomCoinLookupStale || customCoinMetadataQuery.isLoading || customCoinMetadataQuery.isFetching
+                          ? t("createBounty.customCoinTypeLoading")
+                          : customCoinLookupError
+                            ? fm("createBounty.customCoinTypeError", { message: customCoinLookupError })
+                            : customCoinDecimals !== null
+                              ? "Resolved"
+                              : customCoinMetadataQuery.isFetched
+                                ? t("createBounty.customCoinTypeMissing")
+                                : "--"}
+                      </div>
+                    </div>
+                  ) : null}
+                  <div className="app-stack-xs">
+                    <div className="text-[10px] uppercase tracking-widest text-white/40">Wallet Balance</div>
+                    <div className="font-mono text-xs text-white/75">
+                      {!walletAddress
+                        ? "--"
+                        : balanceQuery.isLoading || balanceQuery.isFetching
+                          ? t("createBounty.walletBalanceLoading")
+                          : balanceError
+                            ? fm("createBounty.walletBalanceError", { message: balanceError })
+                            : formattedBalance !== null
+                              ? `${formattedBalance} ${tokenDisplay}`
+                              : "--"}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -331,7 +469,7 @@ export function CreateBountyModal({
                   {t("createBounty.killCountLabel")}: {formData.killCount}
                 </label>
                 <span className="font-mono text-sm font-light text-[#FF0000]">
-                  {t("createBounty.perKillReward")}: {formatDisplayAmount(perKillReward)} {formData.token}
+                  {t("createBounty.perKillReward")}: {formatDisplayAmount(perKillReward)} {tokenDisplay}
                 </span>
               </div>
               <input
@@ -373,7 +511,7 @@ export function CreateBountyModal({
                 {fm("createBounty.timeframeHint", {
                   count: formData.killCount,
                   days: formData.timeframeDays,
-                  reward: `${perKillReward} ${formData.token}`
+                  reward: `${perKillReward} ${tokenDisplay}`
                 })}
               </div>
               {errors.timeframeDays ? <p className="mt-1.5 font-mono text-xs text-[#FF0000]">{errors.timeframeDays}</p> : null}

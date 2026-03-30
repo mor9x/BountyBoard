@@ -1,0 +1,14 @@
+.git
+.DS_Store
+node_modules
+**/node_modules
+**/.data
+**/dist
+*.log
+.env.local
+.env.*.local
+apps/dapp/*
+!apps/dapp/package.json
+contracts
+docs
+skills

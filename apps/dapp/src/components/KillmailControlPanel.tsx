@@ -247,7 +247,7 @@ export function KillmailControlPanel({
     queryKey: [
       "killmail-duel-target",
       environment.simulationWorldPackageId,
-      environment.simulationWorldObjectRegistryId,
+      environment.worldObjectRegistryId,
       targetItemId,
       reportedByCharacter?.tenant ?? "utopia"
     ],
@@ -255,7 +255,7 @@ export function KillmailControlPanel({
     queryFn: async () =>
       frontierClient.getCharacterByItemId({
         worldPackageId: environment.simulationWorldPackageId,
-        worldObjectRegistryId: environment.simulationWorldObjectRegistryId,
+        worldObjectRegistryId: environment.worldObjectRegistryId,
         itemId: targetItemId!,
         tenant: reportedByCharacter?.tenant ?? "utopia"
       })
