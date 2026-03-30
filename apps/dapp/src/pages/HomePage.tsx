@@ -18,6 +18,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { useDAppKit } from "@mysten/dapp-kit-react";
 import { useEffect, useMemo, useState } from "react";
+import { ClaimSuccessModal } from "../components/ClaimSuccessModal";
 import { CreateBountyModal, type CreateBountyFormValue } from "../components/CreateBountyModal";
 import { Navbar } from "../components/Navbar";
 import { TaskList } from "../components/TaskList";
@@ -32,11 +33,34 @@ import { getTranslation, loadLanguagePreference, saveLanguagePreference, toggleL
 
 const emptyCharacters: WalletCharacter[] = [];
 
+type ClaimSuccessState = {
+  amount: number;
+  coinType: string;
+  tokenSymbol: string;
+  transactionDigest: string;
+};
+
 function sortCards(cards: BountyCardModel[], sortType: "totalReward" | "perKillReward" | "timeRemaining") {
   const next = [...cards];
   if (sortType === "perKillReward") return next.sort((left, right) => right.perKillReward - left.perKillReward);
   if (sortType === "timeRemaining") return next.sort((left, right) => left.deadline - right.deadline);
   return next.sort((left, right) => right.rewardAmount - left.rewardAmount);
+}
+
+function extractTransactionDigest(result: unknown) {
+  if (!result || typeof result !== "object") {
+    return null;
+  }
+
+  if ("digest" in result && typeof result.digest === "string" && result.digest.length > 0) {
+    return result.digest;
+  }
+
+  if ("transactionDigest" in result && typeof result.transactionDigest === "string" && result.transactionDigest.length > 0) {
+    return result.transactionDigest;
+  }
+
+  return null;
 }
 
 export function HomePage() {
@@ -51,6 +75,7 @@ export function HomePage() {
   const [pendingActionId, setPendingActionId] = useState<string | null>(null);
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
   const [shouldOpenModalAfterConnect, setShouldOpenModalAfterConnect] = useState(false);
+  const [claimSuccess, setClaimSuccess] = useState<ClaimSuccessState | null>(null);
   const t = (key: string) => getTranslation(currentLang, key);
 
   const walletCharactersQuery = useWalletCharacters();
@@ -243,7 +268,7 @@ export function HomePage() {
   async function handleClaim(bounty: BountyCardModel) {
     if (!selectedWorldCharacter) throw new Error("Connected world character is required");
 
-    await executeTransaction(bounty.id, async () =>
+    const result = await executeTransaction(bounty.id, async () =>
       bounty.kind === "multi"
         ? buildClaimMultiBountyTx({
             packageId: environment.bountyBoardPackageId,
@@ -260,6 +285,18 @@ export function HomePage() {
             hunterCharacterObjectId: selectedWorldCharacter.objectId
           })
     );
+    const transactionDigest = extractTransactionDigest(result);
+
+    if (!transactionDigest) {
+      return;
+    }
+
+    setClaimSuccess({
+      amount: bounty.claimableAmount,
+      coinType: bounty.coinType,
+      tokenSymbol: bounty.tokenSymbol,
+      transactionDigest
+    });
   }
 
   async function handleRefund(bounty: BountyCardModel) {
@@ -472,6 +509,16 @@ export function HomePage() {
           onSubmit={handleCreateBounty}
           selectedCharacter={selectedIdentityCharacter}
           walletAddress={walletAddress ?? null}
+        />
+
+        <ClaimSuccessModal
+          amount={claimSuccess?.amount ?? 0}
+          coinType={claimSuccess?.coinType ?? ""}
+          currentLang={currentLang}
+          isOpen={claimSuccess !== null}
+          onClose={() => setClaimSuccess(null)}
+          tokenSymbol={claimSuccess?.tokenSymbol ?? ""}
+          transactionDigest={claimSuccess?.transactionDigest ?? ""}
         />
       </div>
 

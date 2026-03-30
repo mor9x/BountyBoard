@@ -1,6 +1,7 @@
 import { KILLMAIL_LOSS_TYPE, type MirrorCharacterLookup } from "@bounty-board/frontier-client";
 import { useQuery } from "@tanstack/react-query";
 import { useDeferredValue, useEffect, useRef, useState } from "react";
+import { getExplorerTransactionUrl } from "../lib/explorer";
 import { frontierClient } from "../lib/frontier";
 import { formatMessage, getTranslation } from "../lib/language";
 
@@ -86,10 +87,6 @@ const GAME_CONFIG = {
   maxHealth: 5,
   starCount: 110
 } as const;
-
-function getExplorerTransactionUrl(transactionDigest: string) {
-  return `https://suiscan.xyz/testnet/tx/${transactionDigest}`;
-}
 
 function isPositiveIntegerString(value: string) {
   return /^[1-9]\d*$/.test(value);

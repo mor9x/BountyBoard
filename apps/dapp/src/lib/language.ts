@@ -156,6 +156,12 @@ const translations = {
       title: "Recent Killmail Feed",
       empty: "No killmail events found yet."
     },
+    claimSuccess: {
+      eyebrow: "Claim Complete",
+      title: "Reward Claimed",
+      amountLabel: "Amount Received",
+      ok: "OK"
+    },
     common: {
       close: "Close",
       days: "Days"
@@ -326,6 +332,12 @@ const translations = {
     feed: {
       title: "最近 Killmail Feed",
       empty: "当前还没有 killmail 事件。"
+    },
+    claimSuccess: {
+      eyebrow: "领取完成",
+      title: "奖励已领取",
+      amountLabel: "到账金额",
+      ok: "确定"
     },
     common: {
       close: "关闭",
