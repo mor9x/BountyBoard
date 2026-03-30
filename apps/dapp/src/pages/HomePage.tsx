@@ -52,6 +52,17 @@ function extractTransactionDigest(result: unknown) {
     return null;
   }
 
+  if (
+    "Transaction" in result &&
+    result.Transaction &&
+    typeof result.Transaction === "object" &&
+    "digest" in result.Transaction &&
+    typeof result.Transaction.digest === "string" &&
+    result.Transaction.digest.length > 0
+  ) {
+    return result.Transaction.digest;
+  }
+
   if ("digest" in result && typeof result.digest === "string" && result.digest.length > 0) {
     return result.digest;
   }
@@ -61,6 +72,33 @@ function extractTransactionDigest(result: unknown) {
   }
 
   return null;
+}
+
+function getFailedTransactionError(result: unknown) {
+  if (!result || typeof result !== "object" || !("FailedTransaction" in result)) {
+    return null;
+  }
+
+  const failed = result.FailedTransaction;
+  if (!failed || typeof failed !== "object") {
+    return "Transaction failed";
+  }
+
+  if (
+    "status" in failed &&
+    failed.status &&
+    typeof failed.status === "object" &&
+    "error" in failed.status &&
+    failed.status.error &&
+    typeof failed.status.error === "object" &&
+    "message" in failed.status.error &&
+    typeof failed.status.error.message === "string" &&
+    failed.status.error.message.length > 0
+  ) {
+    return failed.status.error.message;
+  }
+
+  return "Transaction failed";
 }
 
 export function HomePage() {
@@ -172,6 +210,12 @@ export function HomePage() {
     try {
       const transaction = await factory();
       const result = await dAppKit.signAndExecuteTransaction({ transaction });
+      const failedTransactionError = getFailedTransactionError(result);
+
+      if (failedTransactionError) {
+        throw new Error(failedTransactionError);
+      }
+
       await invalidateAll();
       return result;
     } finally {
