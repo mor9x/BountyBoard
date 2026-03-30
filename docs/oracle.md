@@ -64,5 +64,6 @@ Deployment reference values kept in `.env.local`:
 - `AnyLoss` matches all killmails for the target.
 - `ShipOnly` matches `loss_type == SHIP`.
 - `StructureOnly` matches `loss_type == STRUCTURE`.
+- Killmail matching uses the killmail's own `killTimestamp` as the occurrence time when present, and rejects matches older than the bounty or insurance creation time.
 - Character object ids are derived from `WORLD_OBJECT_REGISTRY_ID + TenantItemId`.
 - Insurance trigger writes also require `BOARD_ID` because `Board` now owns the active object registry used for on-chain state tracking.
