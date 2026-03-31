@@ -1,4 +1,10 @@
-import { formatAtomicAmount, type MirrorCharacterLookup, type SupportedToken, type WalletCharacter } from "@bounty-board/frontier-client";
+import {
+  formatAtomicAmount,
+  parseDisplayAmountToAtomicUnits,
+  type MirrorCharacterLookup,
+  type SupportedToken,
+  type WalletCharacter
+} from "@bounty-board/frontier-client";
 import { useQuery } from "@tanstack/react-query";
 import { useDeferredValue, useEffect, useState } from "react";
 import { frontierClient, readClient } from "../lib/frontier";
@@ -214,6 +220,16 @@ export function CreateBountyModal({
     }
     if (formData.killCount < 1 || formData.killCount > 1000) {
       nextErrors.killCount = t("validation.killCountRange");
+    }
+    if (!nextErrors.rewardAmount && formData.killCount > 1 && selectedTokenInfo) {
+      try {
+        const rewardAmount = parseDisplayAmountToAtomicUnits(formData.rewardAmount, selectedTokenInfo);
+        if (rewardAmount % formData.killCount !== 0) {
+          nextErrors.rewardAmount = t("validation.rewardAmountDivisibleByKillCount");
+        }
+      } catch (error) {
+        nextErrors.rewardAmount = error instanceof Error ? error.message : t("validation.rewardAmountPositive");
+      }
     }
     if (formData.timeframeDays < 7 || formData.timeframeDays > 365) {
       nextErrors.timeframeDays = t("validation.timeframeRange");

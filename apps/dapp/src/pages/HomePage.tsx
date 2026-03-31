@@ -244,6 +244,9 @@ export function HomePage() {
           : LOSS_FILTER.any;
 
     const rewardAmount = parseDisplayAmountToAtomicUnits(form.rewardAmount, token);
+    if (form.killCount > 1 && rewardAmount % form.killCount !== 0) {
+      throw new Error(t("validation.rewardAmountDivisibleByKillCount"));
+    }
 
     if (form.isFutureKiller) {
       await executeTransaction("create-insurance", async () =>
