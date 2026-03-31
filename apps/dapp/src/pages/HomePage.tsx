@@ -481,6 +481,18 @@ export function HomePage() {
 
                     <div className="app-grid-metrics">
                       <section className="app-panel-inset app-stack-xs">
+                        <div className="text-[10px] uppercase tracking-widest text-white/40">{t("environment.current")}</div>
+                        <div className="font-mono text-xs uppercase tracking-[0.14em] text-[#FFB066]">
+                          {environment.environmentName}
+                        </div>
+                      </section>
+                      <section className="app-panel-inset app-stack-xs">
+                        <div className="text-[10px] uppercase tracking-widest text-white/40">{t("environment.network")}</div>
+                        <div className="font-mono text-xs uppercase tracking-[0.14em] text-white">
+                          {environment.network}
+                        </div>
+                      </section>
+                      <section className="app-panel-inset app-stack-xs">
                         <div className="text-[10px] uppercase tracking-widest text-white/40">Identity World</div>
                         <div className="break-all font-mono text-xs text-white">{environment.identityWorldPackageId}</div>
                       </section>

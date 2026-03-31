@@ -121,7 +121,7 @@ export function Navbar({
             <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path d="M12 4v16m8-8H4" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} />
             </svg>
-            <span className="font-light tracking-widest">{t("createBounty.button")}</span>
+            <span className="font-bold tracking-widest">{t("createBounty.button")}</span>
           </button>
 
           <div className="app-cluster sm:justify-end">

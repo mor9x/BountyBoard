@@ -3,6 +3,10 @@ type LanguageCode = "en" | "zh";
 const translations = {
   en: {
     appSubtitle: "Player-Driven Bounty System for EVE Frontier",
+    environment: {
+      current: "Server",
+      network: "Network"
+    },
     language: { switch: "Switch Language" },
     sort: {
       title: "Sort By",
@@ -181,6 +185,10 @@ const translations = {
   },
   zh: {
     appSubtitle: "EVE Frontier 玩家驱动型赏金系统",
+    environment: {
+      current: "服务器",
+      network: "网络"
+    },
     language: { switch: "切换语言" },
     sort: {
       title: "排序方式",

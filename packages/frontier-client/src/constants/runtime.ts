@@ -3,6 +3,7 @@ type RuntimeEnv = Record<string, string | undefined>;
 const viteEnv: RuntimeEnv =
   typeof import.meta !== "undefined"
     ? {
+        VITE_FRONTIER_ENVIRONMENT: import.meta.env.VITE_FRONTIER_ENVIRONMENT,
         VITE_SUI_NETWORK: import.meta.env.VITE_SUI_NETWORK,
         VITE_SUI_GRAPHQL_URL: import.meta.env.VITE_SUI_GRAPHQL_URL,
         VITE_SUI_RPC_URL: import.meta.env.VITE_SUI_RPC_URL,
